@@ -1,0 +1,2218 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1a1008">
+<title>中国象棋 · 楚河汉界</title>
+<style>
+/* ============ 基础变量 ============ */
+:root{
+  --cell: 62px;
+  --pad: 0.66;
+  --ui: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --serif: "Kaiti SC", "STKaiti", KaiTi, "Kai", "Songti SC", "STSong", "Noto Serif SC", serif;
+  --gold: #d8b265;
+  --gold-dim: #9c8148;
+  --ink: #241508;
+  --wood-line: rgba(74,43,16,.78);
+  --red-pc: #b3161c;
+  --blk-pc: #1d2630;
+  --robe: #3f5d86;
+  --robe-d: #2d4463;
+  --robe-l: #51739f;
+  --skin: #efc9a4;
+  --skin-d: #d9a97f;
+  --hair: #2a2220;
+  --noise: none;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0;padding:0}
+body{
+  font-family:var(--ui);
+  color:#ecdfc6;
+  overflow:hidden;
+  position:fixed;
+  inset:0;
+  background:#120b06;
+  -webkit-text-size-adjust:100%;
+  touch-action:manipulation;
+  -webkit-user-select:none;user-select:none;
+}
+button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer}
+/* 房间与桌面 */
+#room{
+  position:absolute;inset:0;
+  background:
+    radial-gradient(130% 80% at 50% -10%, rgba(255,214,150,.20) 0%, rgba(120,76,36,.10) 38%, rgba(0,0,0,0) 62%),
+    linear-gradient(#2b1d12 0%, #22160d 42%, #140d07 100%);
+}
+#room:after{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(115% 85% at 50% 42%, rgba(0,0,0,0) 48%, rgba(0,0,0,.55) 100%);
+}
+#room:before{
+  content:"";position:absolute;inset:0;pointer-events:none;opacity:.5;
+  background-image:var(--noise);background-size:160px 160px;
+  mix-blend-mode:overlay;
+}
+/* ============ 总布局 ============ */
+#app{
+  position:absolute;inset:0;display:grid;
+  grid-template-columns:1fr 310px;
+  grid-template-rows:100%;
+}
+#stage{
+  position:relative;display:flex;flex-direction:column;
+  min-width:0;min-height:0;padding:8px 10px 10px;
+}
+#topbar{
+  display:flex;align-items:center;gap:10px;
+  padding:2px 4px 6px;flex:0 0 auto;
+}
+#brand{
+  font-family:var(--serif);font-size:19px;letter-spacing:.14em;
+  color:var(--gold);text-shadow:0 1px 0 rgba(0,0,0,.6);white-space:nowrap;
+}
+#brand small{display:block;font-size:9px;letter-spacing:.3em;color:#8a7858}
+.badge{
+  font-size:11px;padding:3px 9px;border-radius:99px;
+  background:rgba(216,178,101,.12);border:1px solid rgba(216,178,101,.3);
+  color:#e3cb96;white-space:nowrap;
+}
+#topbar .sp{flex:1}
+.iconbtn{
+  width:32px;height:32px;border-radius:9px;display:grid;place-items:center;font-size:15px;
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);
+  transition:background .18s,transform .18s;
+}
+.iconbtn:active{transform:scale(.92)}
+.iconbtn.off{opacity:.42}
+
+/* 对手区 / 玩家区 */
+.zone{
+  flex:0 0 auto;display:flex;align-items:flex-end;gap:12px;
+  padding:0 6px;min-height:0;
+}
+#oppZone{height:clamp(96px,17vh,190px)}
+#meZone{height:auto;padding-top:8px}
+#avatarBox{
+  position:relative;height:100%;width:clamp(150px,24vw,260px);flex:0 0 auto;
+  display:flex;align-items:flex-end;justify-content:center;
+}
+#avatarBox svg{height:100%;width:auto;display:block;overflow:visible}
+#bubble{
+  position:absolute;left:78%;top:4%;transform:translateX(0) scale(.6);
+  transform-origin:0 100%;opacity:0;pointer-events:none;
+  max-width:200px;padding:8px 12px;border-radius:14px 14px 14px 4px;
+  background:linear-gradient(#fff8e8,#f0e0bf);color:#4a3418;
+  font-size:13px;line-height:1.45;white-space:nowrap;
+  box-shadow:0 6px 18px rgba(0,0,0,.45);
+  transition:opacity .22s, transform .28s cubic-bezier(.2,1.5,.4,1);
+  z-index:6;
+}
+#bubble.show{opacity:1;transform:translateX(0) scale(1)}
+.plate{
+  flex:1 1 auto;min-width:0;
+  display:flex;align-items:center;gap:10px;
+  padding:7px 11px;border-radius:12px;
+  background:linear-gradient(rgba(255,255,255,.07),rgba(255,255,255,.02));
+  border:1px solid rgba(255,255,255,.08);
+  box-shadow:0 4px 14px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.07);
+  transition:box-shadow .3s,border-color .3s;
+}
+.plate.active{
+  border-color:rgba(216,178,101,.55);
+  box-shadow:0 0 0 1px rgba(216,178,101,.25),0 6px 22px rgba(216,178,101,.18), inset 0 1px 0 rgba(255,255,255,.1);
+}
+.plate .pdot{
+  width:13px;height:13px;border-radius:50%;flex:0 0 auto;
+  box-shadow:inset 0 -2px 3px rgba(0,0,0,.35),0 0 0 2px rgba(0,0,0,.25);
+}
+.plate.red .pdot{background:radial-gradient(circle at 35% 30%,#ff8f78,#b3161c)}
+.plate.black .pdot{background:radial-gradient(circle at 35% 30%,#6c7a88,#1d2630)}
+.plate .pname{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.plate .ptitle{font-size:10.5px;color:#a4916f;margin-top:1px;white-space:nowrap}
+.plate .pmid{min-width:0;flex:0 1 auto}
+.plate .ptray{
+  flex:1 1 auto;display:flex;flex-wrap:wrap;gap:2px;align-content:center;
+  max-height:34px;overflow:hidden;min-width:0;
+}
+.tchip{
+  width:17px;height:17px;border-radius:50%;display:grid;place-items:center;
+  font-family:var(--serif);font-size:11px;font-weight:700;line-height:1;
+  background:radial-gradient(circle at 36% 30%,#f3dcb3,#c79f66);
+  box-shadow:0 1px 0 #8e6a3c, 0 2px 3px rgba(0,0,0,.35);
+  animation:chipIn .32s cubic-bezier(.2,1.6,.4,1) both;
+}
+.tchip.r{color:var(--red-pc)} .tchip.b{color:var(--blk-pc)}
+@keyframes chipIn{from{transform:scale(0) rotate(-90deg);opacity:0}to{transform:none;opacity:1}}
+.clock{
+  font-variant-numeric:tabular-nums;font-size:16px;font-weight:600;color:#e8d6ac;
+  padding:3px 9px;border-radius:9px;background:rgba(0,0,0,.3);
+  border:1px solid rgba(255,255,255,.07);flex:0 0 auto;letter-spacing:.04em;
+}
+.plate.active .clock{color:#ffe9b5}
+#thinking{font-size:11.5px;color:var(--gold);flex:0 0 auto;opacity:0;transition:opacity .2s;white-space:nowrap}
+#thinking.on{opacity:1}
+#thinking i{animation:dotb 1.1s infinite;font-style:normal}
+#thinking i:nth-child(2){animation-delay:.16s}
+#thinking i:nth-child(3){animation-delay:.32s}
+@keyframes dotb{0%,60%,100%{opacity:.25}30%{opacity:1}}
+
+/* ============ 棋盘 ============ */
+#boardArea{
+  flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center;
+  position:relative;
+}
+#persp{perspective:1900px;perspective-origin:50% 44%}
+#board{
+  position:relative;
+  width:calc(var(--cell) * (8 + 2 * var(--pad)));
+  height:calc(var(--cell) * (9 + 2 * var(--pad)));
+  transform:rotateX(13deg);
+  transform-style:preserve-3d;
+  border-radius:calc(var(--cell) * .1);
+  background:
+    linear-gradient(176deg, rgba(255,255,255,.14), rgba(0,0,0,.05) 40%, rgba(90,50,14,.14)),
+    repeating-linear-gradient(91deg, rgba(120,72,24,.055) 0 2px, rgba(255,255,255,0) 2px 7px),
+    repeating-linear-gradient(88.5deg, rgba(120,72,24,.045) 0 1px, rgba(255,255,255,0) 1px 13px),
+    radial-gradient(120% 90% at 30% 12%, #f0d3a0 0%, #e4c08a 45%, #d3a96f 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.22),
+    inset 0 0 calc(var(--cell)*.5) rgba(126,76,28,.3),
+    0 2px 0 #b2814a, 0 4px 0 #9b6c3a, 0 7px 0 #83582c, 0 10px 0 #6b4622, 0 13px 0 #543519,
+    0 20px 34px rgba(0,0,0,.55), 0 42px 70px rgba(0,0,0,.4);
+}
+#board:after{
+  content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background-image:var(--noise);background-size:150px 150px;opacity:.38;mix-blend-mode:multiply;
+}
+#boardGlow{
+  position:absolute;left:50%;top:50%;width:112%;height:112%;
+  transform:translate(-50%,-50%) translateZ(-30px);
+  border-radius:50%;pointer-events:none;
+  background:radial-gradient(closest-side, rgba(255,205,130,.13), rgba(255,205,130,0) 70%);
+}
+#grid{
+  position:absolute;
+  left:calc(var(--cell) * var(--pad));top:calc(var(--cell) * var(--pad));
+  width:calc(var(--cell) * 8);height:calc(var(--cell) * 9);
+  transform-style:preserve-3d;
+}
+#lines{position:absolute;inset:0;width:100%;height:100%;overflow:visible;display:block}
+#cells,#pieces,#fx,#marks{position:absolute;inset:0;transform-style:preserve-3d}
+#pieces,#fx,#marks{pointer-events:none}
+.cell{
+  position:absolute;width:var(--cell);height:var(--cell);
+  left:calc(var(--cx) * var(--cell));top:calc(var(--cy) * var(--cell));
+  margin:calc(var(--cell) * -.5) 0 0 calc(var(--cell) * -.5);
+  cursor:pointer;
+}
+.cell .dot{
+  position:absolute;left:50%;top:50%;width:calc(var(--cell)*.26);height:calc(var(--cell)*.26);
+  margin:calc(var(--cell)*-.13) 0 0 calc(var(--cell)*-.13);border-radius:50%;
+  background:radial-gradient(circle,rgba(60,140,90,.9),rgba(40,110,70,.35));
+  box-shadow:0 0 calc(var(--cell)*.18) rgba(80,200,130,.5);
+  opacity:0;transform:scale(.2);transition:opacity .2s,transform .26s cubic-bezier(.2,1.6,.4,1);
+}
+.cell.can .dot{opacity:.95;transform:none;animation:dotPulse 1.8s ease-in-out infinite}
+@keyframes dotPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.22)}}
+.cell .ring{
+  position:absolute;left:50%;top:50%;width:calc(var(--cell)*.94);height:calc(var(--cell)*.94);
+  margin:calc(var(--cell)*-.47) 0 0 calc(var(--cell)*-.47);border-radius:50%;
+  border:calc(var(--cell)*.05) solid rgba(214,52,40,.85);
+  box-shadow:0 0 calc(var(--cell)*.3) rgba(230,70,50,.6);
+  opacity:0;transform:scale(.7);transition:opacity .2s,transform .26s cubic-bezier(.2,1.6,.4,1);
+}
+.cell.eat .ring{opacity:1;transform:none;animation:eatPulse 1.3s ease-in-out infinite}
+@keyframes eatPulse{0%,100%{transform:scale(1);opacity:.9}50%{transform:scale(1.08);opacity:.55}}
+/* 起终点标记 */
+.mark{
+  position:absolute;width:calc(var(--cell)*.92);height:calc(var(--cell)*.92);
+  left:calc(var(--mx) * var(--cell));top:calc(var(--my) * var(--cell));
+  margin:calc(var(--cell)*-.46) 0 0 calc(var(--cell)*-.46);
+  animation:markIn .3s ease both;
+}
+.mark span{position:absolute;width:26%;height:26%;border:calc(var(--cell)*.045) solid rgba(216,178,101,.9)}
+.mark span:nth-child(1){left:0;top:0;border-right:0;border-bottom:0}
+.mark span:nth-child(2){right:0;top:0;border-left:0;border-bottom:0}
+.mark span:nth-child(3){left:0;bottom:0;border-right:0;border-top:0}
+.mark span:nth-child(4){right:0;bottom:0;border-left:0;border-top:0}
+.mark.hint span{border-color:rgba(120,230,170,.95)}
+.mark.hint{animation:markIn .3s ease both, hintBlink 1s ease-in-out infinite}
+@keyframes markIn{from{opacity:0;transform:scale(1.4)}to{opacity:1;transform:none}}
+@keyframes hintBlink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ============ 棋子 ============ */
+.piece{
+  position:absolute;left:0;top:0;
+  width:calc(var(--cell)*.9);height:calc(var(--cell)*.9);
+  --pz:0px;--ps:1;
+  transform:
+    translate3d(calc(var(--px) * var(--cell) - 50%), calc(var(--py) * var(--cell) - 50%), var(--pz))
+    scale(var(--ps));
+  transition:transform .3s cubic-bezier(.33,.9,.3,1), box-shadow .22s ease, opacity .2s;
+  border-radius:50%;display:grid;place-items:center;
+  will-change:transform;
+  background:
+    radial-gradient(circle at 34% 26%, rgba(255,255,255,.75), rgba(255,255,255,0) 52%),
+    radial-gradient(circle at 50% 48%, #f6e2bb 0%, #ead0a1 44%, #d7b17a 72%, #b98c50 92%, #9d7039 100%);
+  box-shadow:
+    inset 0 calc(var(--cell)*-.035) calc(var(--cell)*.07) rgba(122,74,26,.4),
+    inset 0 calc(var(--cell)*.02) calc(var(--cell)*.03) rgba(255,255,255,.5),
+    0 1px 0 #c49a62, 0 2px 0 #b98f56, 0 3px 0 #ad8349, 0 4px 0 #9f763f,
+    0 5px 0 #8f6836, 0 6px 0 #7e5a2d, 0 7px 0 #6b4a24,
+    0 9px 9px rgba(0,0,0,.38), 0 14px 18px rgba(0,0,0,.3);
+}
+.piece.blk{
+  background:
+    radial-gradient(circle at 34% 26%, rgba(255,255,255,.6), rgba(255,255,255,0) 52%),
+    radial-gradient(circle at 50% 48%, #ecd4ac 0%, #ddc294 44%, #c7a26d 72%, #a87f46 92%, #8d6834 100%);
+}
+.piece i{
+  position:absolute;left:7%;top:7%;right:7%;bottom:7%;border-radius:50%;
+  border:1px solid rgba(126,80,32,.42);
+  box-shadow:inset 0 1px 2px rgba(120,74,26,.5), 0 1px 0 rgba(255,255,255,.45);
+}
+.piece b{
+  position:relative;font-family:var(--serif);font-weight:700;line-height:1;
+  font-size:calc(var(--cell)*.455);
+  text-shadow:0 1px 0 rgba(255,255,255,.6), 0 -1px 1px rgba(80,30,10,.45), 0 2px 3px rgba(90,50,20,.3);
+}
+.piece.red b{color:var(--red-pc)}
+.piece.blk b{color:var(--blk-pc)}
+.piece.sel{
+  box-shadow:
+    inset 0 calc(var(--cell)*-.035) calc(var(--cell)*.07) rgba(122,74,26,.4),
+    0 1px 0 #c49a62, 0 3px 0 #ad8349, 0 5px 0 #8f6836, 0 7px 0 #6b4a24,
+    0 0 0 calc(var(--cell)*.055) rgba(255,214,120,.85),
+    0 0 calc(var(--cell)*.4) rgba(255,196,80,.75),
+    0 12px 20px rgba(0,0,0,.45);
+}
+.piece.sel{--pz:calc(var(--cell)*.13);--ps:1.04;animation:selGlow 1.5s ease-in-out infinite}
+@keyframes selGlow{
+  0%,100%{box-shadow:
+    inset 0 calc(var(--cell)*-.035) calc(var(--cell)*.07) rgba(122,74,26,.4),
+    0 2px 0 #b98f56, 0 4px 0 #9f763f, 0 6px 0 #7e5a2d, 0 7px 0 #6b4a24,
+    0 0 0 calc(var(--cell)*.04) rgba(255,214,120,.75),
+    0 0 calc(var(--cell)*.3) rgba(255,190,70,.5),
+    0 16px 22px rgba(0,0,0,.45)}
+  50%{box-shadow:
+    inset 0 calc(var(--cell)*-.035) calc(var(--cell)*.07) rgba(122,74,26,.4),
+    0 2px 0 #b98f56, 0 4px 0 #9f763f, 0 6px 0 #7e5a2d, 0 7px 0 #6b4a24,
+    0 0 0 calc(var(--cell)*.08) rgba(255,228,160,.95),
+    0 0 calc(var(--cell)*.62) rgba(255,196,80,.9),
+    0 16px 22px rgba(0,0,0,.45)}
+}
+.piece.lift{
+  box-shadow:
+    inset 0 calc(var(--cell)*-.035) calc(var(--cell)*.07) rgba(122,74,26,.4),
+    0 1px 0 #c49a62, 0 3px 0 #ad8349, 0 5px 0 #8f6836, 0 7px 0 #6b4a24,
+    0 18px 22px rgba(0,0,0,.45), 0 30px 40px rgba(0,0,0,.35);
+  z-index:40;
+}
+.piece.chk{animation:chkPulse .7s ease-in-out infinite}
+@keyframes chkPulse{
+  0%,100%{box-shadow:inset 0 0 0 rgba(0,0,0,0), 0 3px 0 #ad8349, 0 6px 0 #7e5a2d, 0 0 0 2px rgba(255,60,40,.5), 0 0 calc(var(--cell)*.3) rgba(255,50,30,.5), 0 10px 14px rgba(0,0,0,.4)}
+  50%{box-shadow:inset 0 0 0 rgba(0,0,0,0), 0 3px 0 #ad8349, 0 6px 0 #7e5a2d, 0 0 0 calc(var(--cell)*.08) rgba(255,70,40,.8), 0 0 calc(var(--cell)*.55) rgba(255,60,30,.9), 0 10px 14px rgba(0,0,0,.4)}
+}
+.piece.die{opacity:0;--ps:.25;--pz:calc(var(--cell)*.9);transition:transform .34s ease-out, opacity .3s ease-out;z-index:50}
+.piece.born{animation:bornIn .3s ease both}
+@keyframes bornIn{from{opacity:0}to{opacity:1}}
+.noanim .piece,.noanim .cell{transition:none !important}
+
+/* 特效层 */
+.spark{
+  position:absolute;left:calc(var(--fx) * var(--cell));top:calc(var(--fy) * var(--cell));
+  width:0;height:0;
+}
+.spark .wave{
+  position:absolute;left:0;top:0;width:calc(var(--cell)*.9);height:calc(var(--cell)*.9);
+  margin:calc(var(--cell)*-.45) 0 0 calc(var(--cell)*-.45);border-radius:50%;
+  border:calc(var(--cell)*.06) solid rgba(255,212,120,.95);
+  animation:waveOut .55s cubic-bezier(.2,.7,.3,1) forwards;
+}
+@keyframes waveOut{from{transform:scale(.35);opacity:1}to{transform:scale(2.1);opacity:0}}
+.spark .p{
+  position:absolute;width:calc(var(--cell)*.1);height:calc(var(--cell)*.1);
+  margin:calc(var(--cell)*-.05) 0 0 calc(var(--cell)*-.05);border-radius:50%;
+  background:radial-gradient(circle,#fff3c8,#e0a33c);
+  animation:partOut .6s ease-out forwards;
+}
+@keyframes partOut{
+  from{transform:translate(0,0) scale(1);opacity:1}
+  to{transform:translate(var(--dx),var(--dy)) scale(.1);opacity:0}
+}
+#toast{
+  position:absolute;left:50%;top:38%;transform:translate(-50%,-50%) scale(.6);
+  font-family:var(--serif);font-size:clamp(34px,7vmin,70px);font-weight:700;
+  color:#ffdf8d;letter-spacing:.1em;pointer-events:none;opacity:0;z-index:60;
+  text-shadow:0 0 18px rgba(255,80,40,.9),0 0 50px rgba(255,60,20,.6),0 4px 10px rgba(0,0,0,.7);
+}
+#toast.show{animation:toastPop 1.25s ease forwards}
+@keyframes toastPop{
+  0%{opacity:0;transform:translate(-50%,-50%) scale(.4) rotate(-6deg)}
+  18%{opacity:1;transform:translate(-50%,-50%) scale(1.14) rotate(1deg)}
+  32%{transform:translate(-50%,-50%) scale(1) rotate(0)}
+  78%{opacity:1}
+  100%{opacity:0;transform:translate(-50%,-50%) scale(1.1)}
+}
+#flash{position:absolute;inset:-20%;pointer-events:none;opacity:0;z-index:5;
+  background:radial-gradient(closest-side,rgba(255,60,30,.38),rgba(255,60,30,0) 70%)}
+#flash.on{animation:flashHit .6s ease-out}
+@keyframes flashHit{0%{opacity:0}22%{opacity:1}100%{opacity:0}}
+.shake{animation:shk .36s cubic-bezier(.36,.07,.19,.97)}
+@keyframes shk{
+  10%,90%{transform:translate3d(-2px,1px,0)}
+  20%,80%{transform:translate3d(4px,-2px,0)}
+  30%,50%,70%{transform:translate3d(-6px,2px,0)}
+  40%,60%{transform:translate3d(6px,-1px,0)}
+}
+.piece.nono{animation:nono .42s ease}
+@keyframes nono{
+  0%,100%{box-shadow:
+    inset 0 calc(var(--cell)*-.035) calc(var(--cell)*.07) rgba(122,74,26,.4),
+    0 2px 0 #b98f56, 0 4px 0 #9f763f, 0 6px 0 #7e5a2d, 0 7px 0 #6b4a24,
+    0 9px 9px rgba(0,0,0,.38)}
+  35%,70%{box-shadow:
+    inset 0 calc(var(--cell)*-.035) calc(var(--cell)*.07) rgba(122,74,26,.4),
+    0 2px 0 #b98f56, 0 4px 0 #9f763f, 0 6px 0 #7e5a2d, 0 7px 0 #6b4a24,
+    0 0 0 calc(var(--cell)*.07) rgba(255,64,40,.85),
+    0 0 calc(var(--cell)*.45) rgba(255,56,30,.8),
+    0 9px 9px rgba(0,0,0,.38)}
+}
+
+/* ============ 右侧面板 ============ */
+#panel{
+  position:relative;min-height:0;display:flex;flex-direction:column;gap:10px;
+  padding:12px 12px 12px 2px;overflow:hidden;
+}
+.card{
+  background:linear-gradient(rgba(255,255,255,.06),rgba(255,255,255,.015));
+  border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:11px 12px;
+  box-shadow:0 6px 20px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.06);
+}
+.card h3{
+  margin:0 0 9px;font-size:11px;font-weight:600;letter-spacing:.2em;
+  color:var(--gold-dim);text-transform:uppercase;
+}
+.seg{display:flex;gap:6px}
+.seg button{
+  flex:1;padding:8px 4px;border-radius:9px;font-size:12.5px;
+  background:rgba(0,0,0,.26);border:1px solid rgba(255,255,255,.07);
+  transition:all .18s;color:#c9bb9d;
+}
+.seg button.on{
+  background:linear-gradient(rgba(216,178,101,.3),rgba(216,178,101,.13));
+  border-color:rgba(216,178,101,.6);color:#ffeec4;
+  box-shadow:0 2px 10px rgba(216,178,101,.22), inset 0 1px 0 rgba(255,255,255,.14);
+}
+.seg button:active{transform:scale(.96)}
+.seg.col{flex-direction:column}
+.seg.col button{text-align:left;padding:8px 10px;display:flex;align-items:center;gap:8px}
+.seg.col button em{font-style:normal;font-size:10.5px;color:#9b8a68;margin-left:auto}
+.seg.col button.on em{color:#d8c08e}
+.acts{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.acts button{
+  padding:9px 6px;border-radius:9px;font-size:12.5px;
+  background:rgba(0,0,0,.26);border:1px solid rgba(255,255,255,.07);
+  transition:all .18s;
+}
+.acts button:active{transform:scale(.95)}
+.acts button:disabled{opacity:.35}
+.acts button.pri{
+  background:linear-gradient(rgba(190,40,34,.65),rgba(140,22,20,.55));
+  border-color:rgba(255,120,90,.35);color:#ffe6d8;
+}
+#logCard{flex:1 1 auto;min-height:60px;display:flex;flex-direction:column;overflow:hidden}
+#log{
+  flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  font-size:12.5px;line-height:1.75;padding-right:4px;
+}
+#log::-webkit-scrollbar{width:5px}
+#log::-webkit-scrollbar-thumb{background:rgba(216,178,101,.3);border-radius:3px}
+.lrow{display:flex;gap:6px;align-items:baseline;padding:1px 0}
+.lrow .n{width:22px;color:#7e6e52;font-size:11px;flex:0 0 auto;text-align:right}
+.lrow .m{font-family:var(--serif);font-size:13.5px;min-width:72px}
+.lrow .m.r{color:#f2a99e} .lrow .m.b{color:#a8bdd4}
+.lrow.last{background:rgba(216,178,101,.1);border-radius:6px}
+#log .empty{color:#6b5c44;font-size:12px;text-align:center;padding:14px 0}
+#stat{display:flex;gap:10px;font-size:11px;color:#9b8a68;flex-wrap:wrap}
+#stat b{color:#d9c69e;font-weight:600}
+
+/* ============ 遮罩 / 菜单 ============ */
+#veil{
+  position:absolute;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(60% 60% at 50% 40%,rgba(30,18,9,.82),rgba(8,5,2,.95));
+  backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);
+  opacity:0;pointer-events:none;transition:opacity .3s;
+}
+#veil.show{opacity:1;pointer-events:auto}
+.sheet{
+  width:min(92vw,470px);max-height:92vh;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:26px 26px 22px;border-radius:22px;text-align:center;
+  background:linear-gradient(170deg,#2f2013,#1b1108 70%);
+  border:1px solid rgba(216,178,101,.25);
+  box-shadow:0 30px 80px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.08);
+  transform:translateY(14px) scale(.96);opacity:0;transition:transform .36s cubic-bezier(.2,1.3,.4,1),opacity .3s;
+}
+#veil.show .sheet{transform:none;opacity:1}
+.sheet h1{
+  font-family:var(--serif);font-size:34px;margin:2px 0 2px;letter-spacing:.2em;
+  color:#f0d79c;text-shadow:0 2px 0 rgba(0,0,0,.5),0 0 30px rgba(216,178,101,.3);
+}
+.sheet .sub{font-size:11px;letter-spacing:.42em;color:#9c8148;margin-bottom:20px}
+.sheet .grp{text-align:left;margin-bottom:14px}
+.sheet .grp>span{display:block;font-size:11px;letter-spacing:.18em;color:var(--gold-dim);margin-bottom:7px}
+.mode2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.mcard{
+  padding:14px 10px;border-radius:14px;text-align:center;
+  background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.08);transition:all .2s;
+}
+.mcard .ic{font-size:26px;line-height:1.1}
+.mcard .t{font-size:14px;margin-top:5px;font-weight:600}
+.mcard .d{font-size:10.5px;color:#9b8a68;margin-top:2px}
+.mcard.on{
+  background:linear-gradient(rgba(216,178,101,.26),rgba(216,178,101,.08));
+  border-color:rgba(216,178,101,.6);box-shadow:0 4px 18px rgba(216,178,101,.2);
+}
+.sheet .big{
+  width:100%;margin-top:8px;padding:14px;border-radius:13px;font-size:16px;font-weight:600;
+  font-family:var(--serif);letter-spacing:.24em;
+  background:linear-gradient(#c9312b,#8e1a16);color:#fff2e4;
+  box-shadow:0 8px 24px rgba(180,40,30,.4), inset 0 1px 0 rgba(255,255,255,.25);
+  transition:transform .16s;
+}
+.sheet .big:active{transform:scale(.97)}
+.sheet .ghost{
+  width:100%;margin-top:8px;padding:11px;border-radius:12px;font-size:13px;
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);
+}
+#resIcon{font-size:52px;line-height:1}
+#resSub{font-size:13px;color:#b4a382;margin:8px 0 16px;line-height:1.7}
+#resSub b{color:#e8d2a2}
+.tips{margin-top:14px;font-size:11px;color:#7d6c50;line-height:1.7}
+
+/* ============ 窄屏 / 平板 ============ */
+@media (max-width:1000px), (max-aspect-ratio:1/1){
+  #app{grid-template-columns:1fr;grid-template-rows:1fr auto}
+  #panel{
+    flex-direction:row;align-items:center;gap:7px;padding:0 10px 9px;
+    overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;
+  }
+  #panel .card{flex:0 0 auto;padding:7px 8px;border-radius:11px}
+  #panel .card h3{display:none}
+  #panel .seg.col{flex-direction:row}
+  #panel .seg.col button{padding:8px 10px;font-size:12px}
+  #panel .seg.col button em{display:none}
+  #panel .seg button{padding:8px 10px;white-space:nowrap}
+  #panel .acts{grid-template-columns:repeat(4,auto)}
+  #panel .acts button{padding:8px 11px;white-space:nowrap}
+  #logCard{flex:1 1 150px;min-width:130px;max-width:46vw}
+  #log{max-height:40px;overflow-x:auto;overflow-y:hidden;white-space:nowrap;line-height:1.3}
+  #log .lrow{display:inline-flex;margin-right:12px;padding:0}
+  #log .lrow .m{min-width:0;margin-left:3px;font-size:13px}
+  #log .empty{padding:6px 10px}
+  #oppZone{height:clamp(72px,11vh,124px)}
+  #meZone{padding-top:6px}
+  .plate{padding:6px 10px}
+  #statCard{display:none}
+}
+@media (max-width:620px){
+  #brand{font-size:16px}
+  .plate .ptray{display:none}
+  #avatarBox{width:clamp(110px,30vw,170px)}
+}
+@media (max-height:520px){
+  #oppZone{height:72px}
+  #topbar{padding-bottom:2px}
+}
+
+/* ============ 对手形象 ============ */
+#fig{transform-origin:50% 100%;animation:breathe 4.6s ease-in-out infinite}
+@keyframes breathe{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-1.6px) scale(1.006)}}
+#headG{transform-origin:160px 130px;transition:transform .6s cubic-bezier(.3,1.2,.4,1)}
+.think #headG{transform:rotate(-4deg) translateY(-2px)}
+.happy #headG{animation:nod 1s ease-in-out}
+@keyframes nod{0%,100%{transform:rotate(0)}30%{transform:rotate(3deg) translateY(2px)}60%{transform:rotate(-2deg)}}
+.sad #headG{transform:rotate(2deg) translateY(4px)}
+.lid{transform-box:fill-box;transform-origin:50% 0%;transform:scaleY(0);transition:transform .09s linear}
+.blink .lid{transform:scaleY(1)}
+.think .lid{transform:scaleY(.45)}
+#armsRest,#armsThink{transition:opacity .3s}
+#armsThink{opacity:0}
+.think #armsRest{opacity:0}
+.think #armsThink{opacity:1}
+#dots{opacity:0;transition:opacity .3s}
+.think #dots{opacity:1}
+#dots circle{animation:dotFloat 1.6s ease-in-out infinite}
+#dots circle:nth-child(2){animation-delay:.22s}
+#dots circle:nth-child(3){animation-delay:.44s}
+@keyframes dotFloat{0%,100%{opacity:.25;transform:translateY(2px)}50%{opacity:1;transform:translateY(-2px)}}
+#dots circle{transform-box:fill-box;transform-origin:50% 50%}
+#steam path{animation:steam 3.2s ease-in-out infinite;transform-box:fill-box}
+#steam path:nth-child(2){animation-delay:1.05s}
+#steam path:nth-child(3){animation-delay:2.1s}
+@keyframes steam{0%{opacity:0;transform:translateY(4px) scaleY(.7)}30%{opacity:.5}100%{opacity:0;transform:translateY(-16px) scaleY(1.3)}}
+#drop{opacity:0;transition:opacity .4s}
+.sad #drop{opacity:1;animation:dropFall 1.8s ease-in infinite}
+@keyframes dropFall{0%{opacity:0;transform:translateY(-4px)}25%{opacity:.9}100%{opacity:0;transform:translateY(16px)}}
+#lean{transition:transform .5s cubic-bezier(.3,1.1,.4,1)}
+.reach #lean{transform:translateY(7px) scale(1.035)}
+.beard,.specs{opacity:0;transition:opacity .3s}
+.hasBeard .beard{opacity:1}
+.hasSpecs .specs{opacity:1}
+
+/* 棋盘线条 */
+#lines .ln{stroke:var(--wood-line);fill:none;stroke-linecap:round;stroke-linejoin:round}
+#lines .bd{stroke:rgba(64,36,12,.85)}
+#lines .rv{
+  fill:rgba(88,52,18,.46);font-family:var(--serif);font-weight:700;
+  letter-spacing:.06em;paint-order:stroke;
+}
+/* SVG 配色（呈现属性不支持 var，用 CSS 驱动） */
+#gRobe .s0{stop-color:var(--robe-l)}
+#gRobe .s1{stop-color:var(--robe)}
+#gRobe .s2{stop-color:var(--robe-d)}
+#gHair .sh{stop-color:var(--hair)}
+#avatar .rbD{fill:var(--robe-d)}
+#avatar .rbL{fill:var(--robe-l)}
+#avatar .shair{stroke:var(--hair)}
+#avatar .sRobeD{stroke:var(--robe-d)}
+#avatar .sRobe{stroke:var(--robe)}
+#avatar .iris{transform-box:fill-box;transform-origin:50% 50%;transition:transform .5s ease}
+.think #avatar .iris, .think .iris{transform:translateY(2.6px)}
+</style>
+</head>
+<body>
+<div id="room">
+<div id="app">
+
+  <!-- ===== 左：舞台 ===== -->
+  <div id="stage">
+    <div id="topbar">
+      <div id="brand">中国象棋<small>XIANGQI</small></div>
+      <div class="badge" id="modeBadge">人机对战</div>
+      <div class="sp"></div>
+      <button class="iconbtn" id="btnSound" title="音效">🔊</button>
+      <button class="iconbtn" id="btnFlip" title="翻转棋盘">⇅</button>
+      <button class="iconbtn" id="btnMenu" title="设置 / 新局">☰</button>
+    </div>
+
+    <!-- 对手 -->
+    <div class="zone" id="oppZone">
+      <div id="avatarBox">
+        <div id="bubble"></div>
+        <svg id="avatar" viewBox="0 0 320 236" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
+          <defs>
+            <linearGradient id="gSkin" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#f7dcbd"/><stop offset=".55" stop-color="#efc9a4"/><stop offset="1" stop-color="#dcae86"/>
+            </linearGradient>
+            <linearGradient id="gRobe" x1="0" y1="0" x2="0" y2="1">
+              <stop class="s0" offset="0"/><stop class="s1" offset=".5"/><stop class="s2" offset="1"/>
+            </linearGradient>
+            <linearGradient id="gHair" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#4a3c36"/><stop class="sh" offset="1"/>
+            </linearGradient>
+            <linearGradient id="gChair" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#53351f"/><stop offset="1" stop-color="#2d1b0e"/>
+            </linearGradient>
+            <radialGradient id="gCheek"><stop offset="0" stop-color="#e58b74" stop-opacity=".45"/><stop offset="1" stop-color="#e58b74" stop-opacity="0"/></radialGradient>
+            <radialGradient id="gHalo"><stop offset="0" stop-color="#ffd79a" stop-opacity=".22"/><stop offset="1" stop-color="#ffd79a" stop-opacity="0"/></radialGradient>
+          </defs>
+
+          <ellipse cx="160" cy="120" rx="150" ry="118" fill="url(#gHalo)"/>
+
+          <!-- 椅背 -->
+          <g opacity=".95">
+            <rect x="74" y="118" width="172" height="120" rx="14" fill="url(#gChair)"/>
+            <rect x="86" y="130" width="148" height="100" rx="9" fill="none" stroke="#6b4526" stroke-width="2" opacity=".55"/>
+            <rect x="66" y="112" width="16" height="126" rx="8" fill="#3b2412"/>
+            <rect x="238" y="112" width="16" height="126" rx="8" fill="#3b2412"/>
+          </g>
+
+          <g id="lean">
+          <g id="fig">
+            <!-- 身体 -->
+            <path d="M50,236 C52,186 80,158 114,150 L206,150 C240,158 268,186 270,236 Z" fill="url(#gRobe)"/>
+            <path d="M50,236 C52,186 80,158 114,150 L130,150 C106,169 88,201 86,236 Z" fill="#000" opacity=".12"/>
+            <path d="M270,236 C268,186 240,158 206,150 L190,150 C214,169 232,201 234,236 Z" fill="#fff" opacity=".07"/>
+            <!-- 脖子 -->
+            <path d="M140,110 h40 v44 c-8,9 -32,9 -40,0 z" fill="#d9a97f"/>
+            <path d="M140,110 h40 v18 c-10,10 -30,10 -40,0 z" fill="#c2946c"/>
+            <!-- 立领 + 门襟 -->
+            <path d="M134,149 L160,184 L186,149 L176,146 L160,166 L144,146 Z" class="rbD"/>
+            <path d="M138,144 C140,154 148,160 150,170 L142,174 C138,160 132,152 130,147 Z" class="rbL"/>
+            <path d="M182,144 C180,154 172,160 170,170 L178,174 C182,160 188,152 190,147 Z" class="rbL"/>
+            <g stroke="#e8dcc0" stroke-width="2" opacity=".5" stroke-linecap="round">
+              <path d="M152,190 h16"/><path d="M150,206 h20"/><path d="M149,222 h22"/>
+            </g>
+            <circle cx="160" cy="190" r="3.4" fill="#e8dcc0" opacity=".7"/>
+            <circle cx="160" cy="206" r="3.4" fill="#e8dcc0" opacity=".7"/>
+
+            <!-- 头 -->
+            <g id="headG">
+              <ellipse cx="113" cy="95" rx="9" ry="13.5" fill="#e8c096"/>
+              <path d="M110,89 q6,2 4,8 q-1,4 -4,5" stroke="#cb9a72" stroke-width="2" fill="none"/>
+              <ellipse cx="207" cy="95" rx="9" ry="13.5" fill="#e8c096"/>
+              <path d="M210,89 q-6,2 -4,8 q1,4 4,5" stroke="#cb9a72" stroke-width="2" fill="none"/>
+              <ellipse cx="160" cy="88" rx="44" ry="50" fill="url(#gSkin)"/>
+              <path d="M126,112 C132,134 146,142 160,142 C174,142 188,134 194,112 C190,132 178,138 160,138 C142,138 130,132 126,112 Z" fill="#d49c73" opacity=".35"/>
+              <ellipse cx="134" cy="104" rx="12" ry="8" fill="url(#gCheek)"/>
+              <ellipse cx="186" cy="104" rx="12" ry="8" fill="url(#gCheek)"/>
+              <!-- 头发 -->
+              <path d="M112,82 C107,30 133,13 160,13 C187,13 213,30 208,82 C206,58 198,45 182,49 C171,52 164,57 160,57 C156,57 149,52 138,49 C122,45 114,58 112,82 Z" fill="url(#gHair)"/>
+              <path d="M112,80 q3,14 4,24 q5,-4 5,-14 q0,-7 -2,-12 z" fill="url(#gHair)"/>
+              <path d="M208,80 q-3,14 -4,24 q-5,-4 -5,-14 q0,-7 2,-12 z" fill="url(#gHair)"/>
+              <path d="M134,27 C149,19 175,21 188,33 C175,25 149,23 134,27 Z" fill="#fff" opacity=".15"/>
+              <!-- 眉 -->
+              <g class="shair" stroke-width="3.6" stroke-linecap="round" fill="none" id="brows">
+                <path d="M131,71 Q143,63 156,70"/>
+                <path d="M164,70 Q177,63 189,71"/>
+              </g>
+              <!-- 眼 -->
+              <g class="eyeG">
+                <ellipse cx="142" cy="88" rx="10.5" ry="6.6" fill="#fdfaf3"/>
+                <g class="iris"><circle cx="142.5" cy="88.5" r="4.7" fill="#3a2a21"/><circle cx="142.5" cy="88.5" r="2.1" fill="#140d08"/><circle cx="140.8" cy="86.6" r="1.6" fill="#fff" opacity=".9"/></g>
+                <rect class="lid" x="131" y="80.5" width="22" height="14" fill="#efc9a4"/>
+                <path d="M131.5,82 Q142,76.5 152.5,82" stroke="#8c6a4e" stroke-width="1.6" fill="none" opacity=".75"/>
+              </g>
+              <g class="eyeG">
+                <ellipse cx="178" cy="88" rx="10.5" ry="6.6" fill="#fdfaf3"/>
+                <g class="iris"><circle cx="177.5" cy="88.5" r="4.7" fill="#3a2a21"/><circle cx="177.5" cy="88.5" r="2.1" fill="#140d08"/><circle cx="175.8" cy="86.6" r="1.6" fill="#fff" opacity=".9"/></g>
+                <rect class="lid" x="167" y="80.5" width="22" height="14" fill="#efc9a4"/>
+                <path d="M167.5,82 Q178,76.5 188.5,82" stroke="#8c6a4e" stroke-width="1.6" fill="none" opacity=".75"/>
+              </g>
+              <!-- 鼻 -->
+              <path d="M160,92 Q153,105 161,109" stroke="#cf9b74" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+              <!-- 嘴 -->
+              <path id="mouth" d="M147,119 Q160,126 173,119" stroke="#a35546" stroke-width="3.2" fill="none" stroke-linecap="round"/>
+              <!-- 胡须（高难度） -->
+              <g class="beard">
+                <path d="M141,114 Q160,110 179,114 Q160,122 141,114 Z" fill="#cfc9c2"/>
+                <path d="M133,110 C135,140 146,152 160,152 C174,152 185,140 187,110 C185,134 174,144 160,144 C146,144 135,134 133,110 Z" fill="#d9d4cd"/>
+              </g>
+              <!-- 眼镜（大师） -->
+              <g class="specs" stroke="#3a3027" stroke-width="2.6" fill="rgba(200,228,240,.16)">
+                <rect x="126" y="78" width="32" height="22" rx="8"/>
+                <rect x="162" y="78" width="32" height="22" rx="8"/>
+                <path d="M158,86 h4" fill="none"/>
+                <path d="M126,86 L110,92" fill="none"/>
+                <path d="M194,86 L210,92" fill="none"/>
+              </g>
+              <!-- 汗滴 -->
+              <path id="drop" d="M206,70 c5,8 8,12 8,16 a8,8 0 0 1 -16,0 c0,-4 3,-8 8,-16 z" fill="#8fc8e8" opacity="0"/>
+            </g>
+
+            <!-- 手臂：平放 -->
+            <g id="armsRest" stroke-linecap="round" fill="none">
+              <path d="M98,164 L80,208" class="sRobeD" stroke-width="34"/>
+              <path d="M80,208 L130,222" class="sRobe" stroke-width="30"/>
+              <path d="M222,164 L240,208" class="sRobeD" stroke-width="34"/>
+              <path d="M240,208 L190,222" class="sRobe" stroke-width="30"/>
+              <g stroke="none">
+                <ellipse cx="137" cy="223" rx="12.5" ry="9.5" fill="#edc49d"/>
+                <path d="M129,220 q8,-3 16,1" stroke="#d6a67c" stroke-width="1.6" fill="none"/>
+                <ellipse cx="183" cy="223" rx="12.5" ry="9.5" fill="#edc49d"/>
+                <path d="M175,220 q8,-3 16,1" stroke="#d6a67c" stroke-width="1.6" fill="none"/>
+              </g>
+            </g>
+            <!-- 手臂：思考（托腮） -->
+            <g id="armsThink" stroke-linecap="round" fill="none">
+              <path d="M98,164 L80,208" class="sRobeD" stroke-width="34"/>
+              <path d="M80,208 L130,222" class="sRobe" stroke-width="30"/>
+              <g stroke="none">
+                <ellipse cx="137" cy="223" rx="12.5" ry="9.5" fill="#edc49d"/>
+                <path d="M129,220 q8,-3 16,1" stroke="#d6a67c" stroke-width="1.6" fill="none"/>
+              </g>
+              <path d="M226,168 L248,208" class="sRobeD" stroke-width="34"/>
+              <path d="M248,208 L200,150" class="sRobe" stroke-width="28"/>
+              <ellipse cx="190" cy="140" rx="13.5" ry="11.5" fill="#edc49d" stroke="none"/>
+              <path d="M180,136 q9,-4 16,0" stroke="#d9a97f" stroke-width="2.2"/>
+              <path d="M181,144 q8,3 15,0" stroke="#d9a97f" stroke-width="1.8"/>
+            </g>
+          </g>
+          </g>
+
+          <!-- 思考气泡点 -->
+          <g id="dots" fill="#ffe3a8">
+            <circle cx="236" cy="56" r="3.5"/><circle cx="250" cy="44" r="5"/><circle cx="268" cy="30" r="6.5"/>
+          </g>
+          <!-- 茶杯 -->
+          <g id="teacup">
+            <ellipse cx="288" cy="228" rx="26" ry="7" fill="#000" opacity=".3"/>
+            <path d="M272,206 h32 l-4,20 a12,12 0 0 1 -24,0 z" fill="#e9eef2"/>
+            <path d="M272,206 h32 l-1.2,6 h-29.6 z" fill="#c9d4db"/>
+            <path d="M304,210 q10,2 8,9 q-2,6 -10,5" stroke="#dde5ea" stroke-width="3.5" fill="none"/>
+            <ellipse cx="288" cy="207" rx="16" ry="4" fill="#8a6a3a"/>
+            <g id="steam" stroke="#fff" stroke-width="2.4" fill="none" opacity=".55" stroke-linecap="round">
+              <path d="M281,198 q-5,-8 1,-14 q5,-6 0,-12"/>
+              <path d="M290,196 q-5,-8 1,-14 q5,-6 0,-11"/>
+              <path d="M297,199 q-4,-7 1,-12"/>
+            </g>
+          </g>
+        </svg>
+      </div>
+      <div class="plate black" id="oppPlate">
+        <span class="pdot"></span>
+        <div class="pmid">
+          <div class="pname" id="oppName">街坊老李</div>
+          <div class="ptitle" id="oppTitle">业余 · 三级</div>
+        </div>
+        <div id="thinking"><span>思考中</span><i>.</i><i>.</i><i>.</i></div>
+        <div class="ptray" id="oppTray"></div>
+        <div class="clock" id="oppClock">00:00</div>
+      </div>
+    </div>
+
+    <!-- 棋盘 -->
+    <div id="boardArea">
+      <div id="persp">
+        <div id="board">
+          <div id="boardGlow"></div>
+          <div id="grid">
+            <svg id="lines" viewBox="0 0 8 9" preserveAspectRatio="none"></svg>
+            <div id="marks"></div>
+            <div id="cells"></div>
+            <div id="pieces"></div>
+            <div id="fx"></div>
+          </div>
+        </div>
+      </div>
+      <div id="flash"></div>
+      <div id="toast"></div>
+    </div>
+
+    <!-- 我方 -->
+    <div class="zone" id="meZone">
+      <div class="plate red active" id="mePlate">
+        <span class="pdot"></span>
+        <div class="pmid">
+          <div class="pname" id="meName">我</div>
+          <div class="ptitle" id="meTitle">红方 · 先行</div>
+        </div>
+        <div class="ptray" id="meTray"></div>
+        <div class="clock" id="meClock">00:00</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 右：面板 ===== -->
+  <aside id="panel">
+    <div class="card">
+      <h3>对战模式</h3>
+      <div class="seg" id="segMode">
+        <button data-mode="ai" class="on">人机对战</button>
+        <button data-mode="pvp">双人对战</button>
+      </div>
+    </div>
+    <div class="card" id="lvCard">
+      <h3>对手棋力</h3>
+      <div class="seg col" id="segLevel"></div>
+    </div>
+    <div class="card">
+      <h3>执子</h3>
+      <div class="seg" id="segSide">
+        <button data-side="0" class="on">我执红先</button>
+        <button data-side="1">我执黑后</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>操作</h3>
+      <div class="acts">
+        <button class="pri" id="btnNew">重新开局</button>
+        <button id="btnUndo">悔棋</button>
+        <button id="btnHint">提示</button>
+        <button id="btnFlip2">翻转</button>
+      </div>
+    </div>
+    <div class="card" id="logCard">
+      <h3>棋谱</h3>
+      <div id="log"><div class="empty">尚无着法</div></div>
+    </div>
+    <div class="card" id="statCard">
+      <h3>统计</h3>
+      <div id="stat">
+        <span>回合 <b id="stMove">1</b></span>
+        <span>吃子 <b id="stCap">0</b></span>
+        <span>AI算力 <b id="stNodes">—</b></span>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<!-- ===== 遮罩 ===== -->
+<div id="veil">
+  <div class="sheet" id="menuSheet">
+    <h1>中国象棋</h1>
+    <div class="sub">楚 河 汉 界</div>
+    <div class="grp">
+      <span>选择模式</span>
+      <div class="mode2" id="mMode">
+        <button class="mcard on" data-mode="ai"><div class="ic">🧠</div><div class="t">人机对战</div><div class="d">与棋手对坐</div></button>
+        <button class="mcard" data-mode="pvp"><div class="ic">👥</div><div class="t">双人对战</div><div class="d">同屏轮流走</div></button>
+      </div>
+    </div>
+    <div class="grp" id="mLvGrp">
+      <span>对手棋力</span>
+      <div class="seg col" id="mLevel"></div>
+    </div>
+    <div class="grp" id="mSideGrp">
+      <span>我方执子</span>
+      <div class="seg" id="mSide">
+        <button data-side="0" class="on">红方（先行）</button>
+        <button data-side="1">黑方（后行）</button>
+      </div>
+    </div>
+    <button class="big" id="btnStart">开 始 对 局</button>
+    <div class="tips">点击棋子选中，再点亮点落子 · 支持触屏与鼠标</div>
+  </div>
+
+  <div class="sheet" id="resSheet" style="display:none">
+    <div id="resIcon">🏆</div>
+    <h1 id="resTitle">红方胜</h1>
+    <div class="sub" id="resWay">绝杀</div>
+    <div id="resSub"></div>
+    <button class="big" id="btnAgain">再 来 一 局</button>
+    <button class="ghost" id="btnReview">查看棋盘</button>
+  </div>
+</div>
+</div>
+
+<!-- ============================================================
+     象棋引擎：主线程与 Web Worker 共用同一份源码
+     ============================================================ -->
+<script id="engineSrc" type="text/x-xiangqi-engine">
+(function(root){
+'use strict';
+var KING=1,ADV=2,ELE=3,HRS=4,ROK=5,CAN=6,PAW=7;
+var VAL=[0,6000,220,230,430,960,470,100];
+var INF=1e9, MATE=100000;
+
+var START=[
+  13,12,11,10, 9,10,11,12,13,
+   0, 0, 0, 0, 0, 0, 0, 0, 0,
+   0,14, 0, 0, 0, 0, 0,14, 0,
+  15, 0,15, 0,15, 0,15, 0,15,
+   0, 0, 0, 0, 0, 0, 0, 0, 0,
+   0, 0, 0, 0, 0, 0, 0, 0, 0,
+   7, 0, 7, 0, 7, 0, 7, 0, 7,
+   0, 6, 0, 0, 0, 0, 0, 6, 0,
+   0, 0, 0, 0, 0, 0, 0, 0, 0,
+   5, 4, 3, 2, 1, 2, 3, 4, 5
+];
+var CHAR=[];
+CHAR[1]='帅';CHAR[2]='仕';CHAR[3]='相';CHAR[4]='马';CHAR[5]='车';CHAR[6]='炮';CHAR[7]='兵';
+CHAR[9]='将';CHAR[10]='士';CHAR[11]='象';CHAR[12]='馬';CHAR[13]='車';CHAR[14]='砲';CHAR[15]='卒';
+var CN=['','一','二','三','四','五','六','七','八','九'];
+
+var DX=[1,-1,0,0], DY=[0,0,1,-1];
+var HX=[1,2,2,1,-1,-2,-2,-1], HY=[2,1,-1,-2,-2,-1,1,2];
+var EX=[2,2,-2,-2], EY=[2,-2,-2,2];
+var AX=[1,1,-1,-1], AY=[1,-1,-1,1];
+
+/* ---------- 位置价值表 ---------- */
+function flat(rows){ var a=new Int16Array(90),i,j; for(i=0;i<10;i++) for(j=0;j<9;j++) a[i*9+j]=rows[i][j]; return a; }
+function mirror(a){ var b=new Int16Array(90),y,x; for(y=0;y<10;y++) for(x=0;x<9;x++) b[y*9+x]=a[(9-y)*9+x]; return b; }
+function sparse(list){ var a=new Int16Array(90),i; for(i=0;i<list.length;i++) a[list[i][1]*9+list[i][0]]=list[i][2]; return a; }
+
+var T_PAW=flat([
+  [10,12,14,26,34,26,14,12,10],
+  [22,34,48,64,76,64,48,34,22],
+  [22,32,44,58,68,58,44,32,22],
+  [14,20,28,38,48,38,28,20,14],
+  [ 8,12,18,24,30,24,18,12, 8],
+  [ 2, 4, 8,12,16,12, 8, 4, 2],
+  [ 0, 0, 0, 2, 6, 2, 0, 0, 0],
+  [ 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [ 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [ 0, 0, 0, 0, 0, 0, 0, 0, 0]]);
+var T_HRS=flat([
+  [ 0, 2, 6, 8, 8, 8, 6, 2, 0],
+  [ 4,10,16,18,18,18,16,10, 4],
+  [ 8,16,22,26,26,26,22,16, 8],
+  [10,18,24,30,30,30,24,18,10],
+  [10,18,24,28,28,28,24,18,10],
+  [ 8,16,20,24,24,24,20,16, 8],
+  [ 6,12,16,18,18,18,16,12, 6],
+  [ 4, 8,12,14,14,14,12, 8, 4],
+  [ 0, 4, 8,10,10,10, 8, 4, 0],
+  [ 0,-4, 2, 2, 2, 2, 2,-4, 0]]);
+var T_CAN=flat([
+  [ 6, 4, 0,-8,-10,-8, 0, 4, 6],
+  [ 2, 2, 0,-4,-12,-4, 0, 2, 2],
+  [ 2, 2, 0,-8,-6,-8, 0, 2, 2],
+  [ 0, 0,-2, 4,10, 4,-2, 0, 0],
+  [ 0, 0, 0, 4, 8, 4, 0, 0, 0],
+  [-2, 0, 4, 6, 8, 6, 4, 0,-2],
+  [ 0, 0, 0, 2, 4, 2, 0, 0, 0],
+  [ 0, 2, 4, 6, 6, 6, 4, 2, 0],
+  [ 0, 2, 4, 8, 8, 8, 4, 2, 0],
+  [ 0, 0, 2, 6, 6, 6, 2, 0, 0]]);
+var T_ROK=flat([
+  [12,16,12,18,20,18,12,16,12],
+  [16,20,18,24,26,24,18,20,16],
+  [12,16,14,20,22,20,14,16,12],
+  [12,18,16,22,22,22,16,18,12],
+  [12,18,16,22,22,22,16,18,12],
+  [12,16,14,20,20,20,14,16,12],
+  [ 6,10, 8,14,14,14, 8,10, 6],
+  [ 4, 8, 6,14,12,14, 6, 8, 4],
+  [ 8, 4, 8,16, 8,16, 8, 4, 8],
+  [-2,10, 6,14,12,14, 6,10,-2]]);
+var T_ADV=sparse([[4,8,12],[3,9,2],[5,9,2],[3,7,0],[5,7,0]]);
+var T_ELE=sparse([[4,7,12],[2,9,2],[6,9,2],[0,7,2],[8,7,2],[2,5,6],[6,5,6]]);
+var T_KING=sparse([[4,9,0],[3,9,-2],[5,9,-2],[4,8,-4],[3,8,-6],[5,8,-6],[4,7,-12],[3,7,-14],[5,7,-14]]);
+
+var PST=[[],[]];
+PST[0][PAW]=T_PAW; PST[0][HRS]=T_HRS; PST[0][CAN]=T_CAN; PST[0][ROK]=T_ROK;
+PST[0][ADV]=T_ADV; PST[0][ELE]=T_ELE; PST[0][KING]=T_KING;
+for(var _t=1;_t<=7;_t++) PST[1][_t]=mirror(PST[0][_t]);
+
+/* ---------- 棋局状态 ---------- */
+var bd=new Int8Array(90), kp=[85,4], stm=0;
+var Z1=new Int32Array(1440), Z2=new Int32Array(1440), ZS1=0, ZS2=0, h1=0, h2=0;
+(function(){
+  var s=0x2545f491|0;
+  function r(){ s^=s<<13; s|=0; s^=s>>>17; s^=s<<5; s|=0; return s; }
+  for(var i=0;i<1440;i++){ Z1[i]=r(); Z2[i]=r(); }
+  ZS1=r(); ZS2=r();
+})();
+
+function findKings(){
+  kp[0]=-1; kp[1]=-1;
+  for(var i=0;i<90;i++){ var p=bd[i]; if(p===1) kp[0]=i; else if(p===9) kp[1]=i; }
+}
+function rehash(){
+  h1=0;h2=0;
+  for(var i=0;i<90;i++){ var p=bd[i]; if(p){ h1^=Z1[p*90+i]; h2^=Z2[p*90+i]; } }
+  if(stm){ h1^=ZS1; h2^=ZS2; }
+}
+function load(arr,s){ bd.set(arr); stm=s|0; findKings(); rehash(); }
+
+function mk(m){
+  var f=m>>7, t=m&127, pc=bd[f], cap=bd[t];
+  if(cap){ h1^=Z1[cap*90+t]; h2^=Z2[cap*90+t]; }
+  h1^=Z1[pc*90+f]^Z1[pc*90+t]; h2^=Z2[pc*90+f]^Z2[pc*90+t];
+  bd[t]=pc; bd[f]=0;
+  if((pc&7)===KING) kp[(pc>>3)&1]=t;
+  h1^=ZS1; h2^=ZS2; stm^=1;
+  return cap;
+}
+function um(m,cap){
+  var f=m>>7, t=m&127, pc=bd[t];
+  bd[f]=pc; bd[t]=cap;
+  if((pc&7)===KING) kp[(pc>>3)&1]=f;
+  h1^=Z1[pc*90+f]^Z1[pc*90+t]; h2^=Z2[pc*90+f]^Z2[pc*90+t];
+  if(cap){ h1^=Z1[cap*90+t]; h2^=Z2[cap*90+t]; }
+  h1^=ZS1; h2^=ZS2; stm^=1;
+}
+function inPalace(s,x,y){ return x>=3&&x<=5 && (s===0 ? (y>=7&&y<=9) : (y>=0&&y<=2)); }
+
+/* ---------- 着法生成（伪合法） ---------- */
+function gen(s,out){
+  var n=0,i,d,k;
+  for(i=0;i<90;i++){
+    var p=bd[i]; if(p===0) continue;
+    if(((p>>3)&1)!==s) continue;
+    var t=p&7, x=i%9, y=(i-x)/9;
+    if(t===ROK){
+      for(d=0;d<4;d++){
+        var cx=x+DX[d], cy=y+DY[d];
+        while(cx>=0&&cx<9&&cy>=0&&cy<10){
+          var j=cy*9+cx, q=bd[j];
+          if(q===0){ out[n++]=(i<<7)|j; }
+          else { if(((q>>3)&1)!==s) out[n++]=(i<<7)|j; break; }
+          cx+=DX[d]; cy+=DY[d];
+        }
+      }
+    } else if(t===CAN){
+      for(d=0;d<4;d++){
+        var bx=x+DX[d], by=y+DY[d], screen=0;
+        while(bx>=0&&bx<9&&by>=0&&by<10){
+          var j2=by*9+bx, q2=bd[j2];
+          if(!screen){
+            if(q2===0) out[n++]=(i<<7)|j2; else screen=1;
+          } else if(q2!==0){
+            if(((q2>>3)&1)!==s) out[n++]=(i<<7)|j2;
+            break;
+          }
+          bx+=DX[d]; by+=DY[d];
+        }
+      }
+    } else if(t===HRS){
+      for(k=0;k<8;k++){
+        var nx=x+HX[k], ny=y+HY[k];
+        if(nx<0||nx>8||ny<0||ny>9) continue;
+        var lx,ly;
+        if(HX[k]===2||HX[k]===-2){ lx=x+(HX[k]>>1); ly=y; }
+        else { lx=x; ly=y+(HY[k]>0?1:-1); }
+        if(bd[ly*9+lx]!==0) continue;
+        var q3=bd[ny*9+nx];
+        if(q3===0||((q3>>3)&1)!==s) out[n++]=(i<<7)|(ny*9+nx);
+      }
+    } else if(t===ELE){
+      for(k=0;k<4;k++){
+        var ex=x+EX[k], ey=y+EY[k];
+        if(ex<0||ex>8) continue;
+        if(s===0){ if(ey<5||ey>9) continue; } else { if(ey<0||ey>4) continue; }
+        if(bd[(y+(EY[k]>>1))*9+(x+(EX[k]>>1))]!==0) continue;
+        var q4=bd[ey*9+ex];
+        if(q4===0||((q4>>3)&1)!==s) out[n++]=(i<<7)|(ey*9+ex);
+      }
+    } else if(t===ADV){
+      for(k=0;k<4;k++){
+        var ax=x+AX[k], ay=y+AY[k];
+        if(!inPalace(s,ax,ay)) continue;
+        var q5=bd[ay*9+ax];
+        if(q5===0||((q5>>3)&1)!==s) out[n++]=(i<<7)|(ay*9+ax);
+      }
+    } else if(t===KING){
+      for(d=0;d<4;d++){
+        var kx=x+DX[d], ky=y+DY[d];
+        if(!inPalace(s,kx,ky)) continue;
+        var q6=bd[ky*9+kx];
+        if(q6===0||((q6>>3)&1)!==s) out[n++]=(i<<7)|(ky*9+kx);
+      }
+    } else { /* PAW */
+      var fy = s===0 ? y-1 : y+1;
+      if(fy>=0&&fy<=9){
+        var q7=bd[fy*9+x];
+        if(q7===0||((q7>>3)&1)!==s) out[n++]=(i<<7)|(fy*9+x);
+      }
+      var crossed = s===0 ? y<=4 : y>=5;
+      if(crossed){
+        if(x>0){ var q8=bd[y*9+x-1]; if(q8===0||((q8>>3)&1)!==s) out[n++]=(i<<7)|(y*9+x-1); }
+        if(x<8){ var q9=bd[y*9+x+1]; if(q9===0||((q9>>3)&1)!==s) out[n++]=(i<<7)|(y*9+x+1); }
+      }
+    }
+  }
+  return n;
+}
+
+/* ---------- 将军判断（含白脸将） ---------- */
+function inCheck(s){
+  var k=kp[s];
+  if(k<0) return true;
+  var kx=k%9, ky=(k-kx)/9, e=s^1, d,i;
+  for(d=0;d<4;d++){
+    var cx=kx+DX[d], cy=ky+DY[d], first=0;
+    while(cx>=0&&cx<9&&cy>=0&&cy<10){
+      var q=bd[cy*9+cx];
+      if(q!==0){
+        var qs=(q>>3)&1, qt=q&7;
+        if(!first){
+          if(qs===e && (qt===ROK||qt===KING)) return true;
+          first=1;
+        } else {
+          if(qs===e && qt===CAN) return true;
+          break;
+        }
+      }
+      cx+=DX[d]; cy+=DY[d];
+    }
+  }
+  var eh = HRS|(e<<3);
+  for(i=0;i<8;i++){
+    var hx=kx+HX[i], hy=ky+HY[i];
+    if(hx<0||hx>8||hy<0||hy>9) continue;
+    if(bd[hy*9+hx]!==eh) continue;
+    var ddx=kx-hx, ddy=ky-hy, lx, ly;
+    if(ddx===2||ddx===-2){ lx=hx+(ddx>>1); ly=hy; }
+    else { lx=hx; ly=hy+(ddy>0?1:-1); }
+    if(bd[ly*9+lx]===0) return true;
+  }
+  var ep = PAW|(e<<3);
+  if(s===0){
+    if(ky>0 && bd[(ky-1)*9+kx]===ep) return true;
+    if(kx>0 && bd[ky*9+kx-1]===ep && ky>=5) return true;
+    if(kx<8 && bd[ky*9+kx+1]===ep && ky>=5) return true;
+  } else {
+    if(ky<9 && bd[(ky+1)*9+kx]===ep) return true;
+    if(kx>0 && bd[ky*9+kx-1]===ep && ky<=4) return true;
+    if(kx<8 && bd[ky*9+kx+1]===ep && ky<=4) return true;
+  }
+  return false;
+}
+
+/* ---------- 合法着法 ---------- */
+var tmpList=new Int32Array(256);
+function legal(s){
+  var n=gen(s,tmpList), res=[], i;
+  for(i=0;i<n;i++){
+    var m=tmpList[i], cap=mk(m);
+    if(!inCheck(stm^1)) res.push(m);
+    um(m,cap);
+  }
+  return res;
+}
+
+/* ---------- 局面评估 ---------- */
+function evaluate(){
+  var sc=0,i;
+  for(i=0;i<90;i++){
+    var p=bd[i]; if(p===0) continue;
+    var t=p&7, s=(p>>3)&1, v=VAL[t]+PST[s][t][i];
+    sc += s===0 ? v : -v;
+  }
+  return stm===0 ? sc : -sc;
+}
+
+/* ---------- 搜索 ---------- */
+var TT=new Map(), HIST=new Int32Array(8100), KILL=new Int32Array(128);
+var nodes=0, deadline=0, aborted=false, rep=[];
+var LS=[], i0;
+for(i0=0;i0<72;i0++) LS.push(new Int32Array(256));
+
+function isRep(){
+  for(var r=rep.length-1;r>=0;r--) if(rep[r]===h1) return true;
+  return false;
+}
+function tick(){
+  if((nodes&511)===0 && Date.now()>deadline){ aborted=true; return true; }
+  return false;
+}
+function order(list,n,sc,ttm,ply){
+  var i;
+  for(i=0;i<n;i++){
+    var m=list[i];
+    if(m===ttm){ sc[i]=2000000; continue; }
+    var v=bd[m&127];
+    if(v) sc[i]=1000000+VAL[v&7]*8-VAL[bd[m>>7]&7];
+    else if(m===KILL[ply*2]) sc[i]=900000;
+    else if(m===KILL[ply*2+1]) sc[i]=890000;
+    else sc[i]=HIST[(m>>7)*90+(m&127)];
+  }
+}
+function pick(list,n,sc,from){
+  var bi=from,i;
+  for(i=from+1;i<n;i++) if(sc[i]>sc[bi]) bi=i;
+  if(bi!==from){
+    var tm=list[from]; list[from]=list[bi]; list[bi]=tm;
+    var ts=sc[from]; sc[from]=sc[bi]; sc[bi]=ts;
+  }
+  return list[from];
+}
+
+function qs(alpha,beta,qd){
+  nodes++;
+  if(tick()) return 0;
+  var chk=inCheck(stm);
+  if(!chk){
+    var st=evaluate();
+    if(st>=beta) return beta;
+    if(st>alpha) alpha=st;
+    if(qd>=8) return alpha;
+  } else if(qd>=10) return evaluate();
+  var list=LS[56+ (qd>15?15:qd)], sc=new Int32Array(1);
+  var n=gen(stm,list), i, legalN=0;
+  var best=-INF;
+  var ord=[];
+  for(i=0;i<n;i++){
+    var m=list[i], v=bd[m&127];
+    if(!chk && v===0) continue;
+    ord.push([v?1000000+VAL[v&7]*8-VAL[bd[m>>7]&7]:0, m]);
+  }
+  ord.sort(function(a,b){return b[0]-a[0]});
+  for(i=0;i<ord.length;i++){
+    var mv=ord[i][1], cap=mk(mv);
+    if(inCheck(stm^1)){ um(mv,cap); continue; }
+    legalN++;
+    var s2=-qs(-beta,-alpha,qd+1);
+    um(mv,cap);
+    if(aborted) return 0;
+    if(s2>best) best=s2;
+    if(s2>alpha) alpha=s2;
+    if(alpha>=beta) return beta;
+  }
+  if(chk && legalN===0) return -MATE+60;
+  return alpha;
+}
+
+function ab(depth,alpha,beta,ply){
+  if(ply>0 && isRep()) return 0;
+  if(depth<=0) return qs(alpha,beta,0);
+  nodes++;
+  if(tick()) return 0;
+  var ttm=0, e=TT.get(h1);
+  if(e && e.k===h2){
+    if(e.d>=depth && ply>0){
+      if(e.f===0) return e.s;
+      if(e.f===1 && e.s<=alpha) return e.s;
+      if(e.f===2 && e.s>=beta) return e.s;
+    }
+    ttm=e.m;
+  }
+  var list=LS[ply>50?50:ply], sc=LS[ply>50?50:ply].scoreBuf || (LS[ply>50?50:ply].scoreBuf=new Int32Array(256));
+  var n=gen(stm,list);
+  order(list,n,sc,ttm,ply&31);
+  var best=-INF, bestM=0, cnt=0, a0=alpha, i;
+  rep.push(h1);
+  for(i=0;i<n;i++){
+    var m=pick(list,n,sc,i), cap=mk(m);
+    if(inCheck(stm^1)){ um(m,cap); continue; }
+    cnt++;
+    var ext = (ply<24 && inCheck(stm)) ? 1 : 0;
+    var s2;
+    if(cnt===1) s2=-ab(depth-1+ext,-beta,-alpha,ply+1);
+    else {
+      s2=-ab(depth-1+ext,-alpha-1,-alpha,ply+1);
+      if(!aborted && s2>alpha && s2<beta) s2=-ab(depth-1+ext,-beta,-alpha,ply+1);
+    }
+    um(m,cap);
+    if(aborted){ rep.pop(); return 0; }
+    if(s2>best){ best=s2; bestM=m; }
+    if(s2>alpha){
+      alpha=s2;
+      if(alpha>=beta){
+        if(cap===0){
+          var kk=(ply&31)*2;
+          if(KILL[kk]!==m){ KILL[kk+1]=KILL[kk]; KILL[kk]=m; }
+          HIST[(m>>7)*90+(m&127)]+=depth*depth;
+        }
+        break;
+      }
+    }
+  }
+  rep.pop();
+  if(cnt===0) return -MATE+ply;
+  if(!aborted){
+    var f = best<=a0 ? 1 : (alpha>=beta ? 2 : 0);
+    if(TT.size>700000) TT.clear();
+    TT.set(h1,{k:h2,d:depth,s:best,f:f,m:bestM});
+  }
+  return best;
+}
+
+function think(arr,s,maxDepth,maxMs,repHashes){
+  load(arr,s);
+  TT.clear(); HIST=new Int32Array(8100); KILL=new Int32Array(128);
+  nodes=0; aborted=false; deadline=Date.now()+(maxMs||1000);
+  rep=(repHashes||[]).slice();
+  var roots=legal(s);
+  if(roots.length===0) return {move:0,score:-MATE,depth:0,nodes:0,list:[],mate:true};
+  var scored=roots.map(function(m){ return {m:m,s:0}; }), best=roots[0], bestS=0, done=0, d;
+  for(d=1; d<=maxDepth; d++){
+    scored.sort(function(a,b){ return b.s-a.s; });
+    var cur=[], alpha=-INF, bm=0, bs=-INF, i;
+    rep.push(h1);
+    for(i=0;i<scored.length;i++){
+      var m=scored[i].m, cap=mk(m);
+      var v=-ab(d-1,-INF,-alpha,1);
+      um(m,cap);
+      if(aborted){ rep.pop(); break; }
+      cur.push({m:m,s:v});
+      if(v>bs){ bs=v; bm=m; }
+      if(v>alpha) alpha=v;
+    }
+    if(!aborted) rep.pop();
+    if(aborted || !cur.length) break;
+    scored=cur; best=bm; bestS=bs; done=d;
+    if(bs>MATE-1000) break;
+  }
+  scored.sort(function(a,b){ return b.s-a.s; });
+  return {move:best,score:bestS,depth:done,nodes:nodes,
+          list:scored.slice(0,8).map(function(e){return {m:e.m,s:e.s};})};
+}
+
+/* ---------- 中文记谱 ---------- */
+function moveName(arr,m){
+  bd.set(arr);
+  var f=m>>7, t=m&127, p=bd[f];
+  if(!p) return '';
+  var s=(p>>3)&1, ty=p&7;
+  var fx=f%9, fy=(f-fx)/9, tx=t%9, tyy=(t-tx)/9;
+  var ch=CHAR[p];
+  var fnum = s===0 ? CN[9-fx] : String(fx+1);
+  var tnum = s===0 ? CN[9-tx] : String(tx+1);
+  var head = ch+fnum, y;
+  if(ty!==KING){
+    var same=[];
+    for(y=0;y<10;y++) if(bd[y*9+fx]===p) same.push(y);
+    if(same.length>1){
+      same.sort(function(a,b){ return s===0 ? a-b : b-a; });
+      var k=same.indexOf(fy);
+      if(same.length===2) head=(k===0?'前':'后')+ch;
+      else if(same.length===3) head=['前','中','后'][k]+ch;
+      else head=CN[k+1]+ch;
+    }
+  }
+  var act;
+  if(fy===tyy) act='平'+tnum;
+  else {
+    var fwd = s===0 ? (tyy<fy) : (tyy>fy);
+    var dd = tyy>fy ? tyy-fy : fy-tyy;
+    if(ty===ROK||ty===CAN||ty===PAW||ty===KING) act=(fwd?'进':'退')+(s===0?CN[dd]:String(dd));
+    else act=(fwd?'进':'退')+tnum;
+  }
+  return head+act;
+}
+
+/* ---------- 对外接口 ---------- */
+root.XQ={
+  START:START, CHAR:CHAR, VAL:VAL,
+  KING:KING,ADV:ADV,ELE:ELE,HRS:HRS,ROK:ROK,CAN:CAN,PAW:PAW,
+  legalMoves:function(arr,s){ load(arr,s); return legal(s); },
+  inCheck:function(arr,s){ load(arr,s); return inCheck(s); },
+  hashOf:function(arr,s){ load(arr,s); return h1; },
+  think:think,
+  moveName:moveName
+};
+if(typeof WorkerGlobalScope!=='undefined' && root instanceof WorkerGlobalScope){
+  root.onmessage=function(ev){
+    var d=ev.data;
+    if(d && d.cmd==='go'){
+      var t0=Date.now();
+      var r=think(d.bd,d.stm,d.depth,d.ms,d.rep);
+      r.id=d.id; r.ms=Date.now()-t0;
+      root.postMessage(r);
+    }
+  };
+}
+})(self);
+</script>
+
+<script>
+(function(){
+'use strict';
+var $=function(s){return document.querySelector(s)};
+var sleep=function(ms){return new Promise(function(r){setTimeout(r,ms)})};
+
+/* ===== 装载引擎（主线程 + Worker 共用同一份源码） ===== */
+var engineSrc=document.getElementById('engineSrc').textContent;
+new Function('self',engineSrc)(window);
+var XQ=window.XQ;
+
+var worker=null, pending={}, seq=0;
+try{
+  var blobUrl=URL.createObjectURL(new Blob([engineSrc],{type:'application/javascript'}));
+  worker=new Worker(blobUrl);
+  worker.onmessage=function(e){
+    var cb=pending[e.data.id];
+    if(cb){ delete pending[e.data.id]; cb(e.data); }
+  };
+  worker.onerror=function(){ worker=null; };
+}catch(err){ worker=null; }
+
+function askEngine(bdArr,stm,depth,ms,rep){
+  var arr=Array.prototype.slice.call(bdArr);
+  return new Promise(function(res){
+    if(worker){
+      var id=++seq, done=false;
+      pending[id]=function(r){ done=true; res(r); };
+      setTimeout(function(){
+        if(!done && pending[id]){
+          delete pending[id];
+          res(XQ.think(arr,stm,Math.min(depth,4),800,rep));
+        }
+      }, ms+3000);
+      try{ worker.postMessage({cmd:'go',bd:arr,stm:stm,depth:depth,ms:ms,rep:rep,id:id}); }
+      catch(e2){ delete pending[id]; setTimeout(function(){res(XQ.think(arr,stm,Math.min(depth,5),Math.min(ms,1500),rep))},20); }
+    }else{
+      setTimeout(function(){ res(XQ.think(arr,stm,Math.min(depth,5),Math.min(ms,1500),rep)); },40);
+    }
+  });
+}
+
+/* ===== 难度与对手形象 ===== */
+var LEVELS=[
+  {name:'小棋童 阿宝', title:'入门 · 一级', depth:2, time:300,  rand:.38, min:450,  robe:'#4f7a6a', robeD:'#3a5c50', robeL:'#639183', hair:'#241d1a', beard:0, specs:0},
+  {name:'街坊 老李',   title:'业余 · 三级', depth:4, time:900,  rand:.12, min:650,  robe:'#3f5d86', robeD:'#2d4463', robeL:'#51739f', hair:'#2a2220', beard:0, specs:0},
+  {name:'棋馆 高手',   title:'高手 · 六级', depth:5, time:1700, rand:.03, min:800,  robe:'#6b3f46', robeD:'#4e2c32', robeL:'#86525a', hair:'#4a4440', beard:1, specs:0},
+  {name:'楚河 老人',   title:'大师 · 九段', depth:6, time:3000, rand:0,   min:900,  robe:'#4a4336', robeD:'#352f26', robeL:'#615948', hair:'#cfc8be', beard:1, specs:1}
+];
+var S={mode:'ai', level:1, mySide:0, flip:false, sound:true};
+try{ var sv=JSON.parse(localStorage.getItem('xq-set')||'{}'); for(var k in sv) if(k in S) S[k]=sv[k]; }catch(e){}
+function save(){ try{ localStorage.setItem('xq-set',JSON.stringify(S)); }catch(e){} }
+
+/* ===== 音效（WebAudio 实时合成，无外部文件） ===== */
+var Sfx={
+  ctx:null, out:null, noise:null,
+  ensure:function(){
+    if(this.ctx) return this.ctx;
+    var AC=window.AudioContext||window.webkitAudioContext;
+    if(!AC) return null;
+    this.ctx=new AC();
+    this.out=this.ctx.createGain(); this.out.gain.value=.85; this.out.connect(this.ctx.destination);
+    var sr=this.ctx.sampleRate, buf=this.ctx.createBuffer(1,sr*.4,sr), d=buf.getChannelData(0);
+    for(var i=0;i<d.length;i++) d[i]=Math.random()*2-1;
+    this.noise=buf;
+    return this.ctx;
+  },
+  unlock:function(){ var c=this.ensure(); if(c&&c.state==='suspended') c.resume(); },
+  nz:function(t,dur,freq,q,vol,type){
+    var c=this.ctx, s=c.createBufferSource(); s.buffer=this.noise;
+    var f=c.createBiquadFilter(); f.type=type||'bandpass'; f.frequency.value=freq; f.Q.value=q||1;
+    var g=c.createGain();
+    g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(vol,t+.004);
+    g.gain.exponentialRampToValueAtTime(.0005,t+dur);
+    s.connect(f); f.connect(g); g.connect(this.out);
+    s.start(t); s.stop(t+dur+.05);
+  },
+  tone:function(t,dur,f0,f1,vol,type){
+    var c=this.ctx, o=c.createOscillator(); o.type=type||'sine';
+    o.frequency.setValueAtTime(f0,t);
+    if(f1) o.frequency.exponentialRampToValueAtTime(f1,t+dur*.8);
+    var g=c.createGain();
+    g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(vol,t+.008);
+    g.gain.exponentialRampToValueAtTime(.0005,t+dur);
+    o.connect(g); g.connect(this.out); o.start(t); o.stop(t+dur+.05);
+  },
+  knock:function(v,p){
+    if(!S.sound) return; var c=this.ensure(); if(!c) return; v=v||1; p=p||1;
+    var t=c.currentTime;
+    this.nz(t,.11,1500*p,1.5,.42*v);
+    this.nz(t,.05,420*p,.8,.3*v,'lowpass');
+    this.tone(t,.14,250*p,95*p,.34*v,'sine');
+  },
+  tick:function(){ if(!S.sound) return; var c=this.ensure(); if(!c) return; this.nz(c.currentTime,.035,4200,.7,.12,'highpass'); },
+  capture:function(){
+    if(!S.sound) return; var c=this.ensure(); if(!c) return;
+    var t=c.currentTime;
+    this.nz(t,.1,2600,.9,.4,'highpass');
+    this.nz(t,.16,1100,1.2,.5);
+    this.tone(t,.2,200,70,.42,'sine');
+    this.nz(t+.07,.12,1800,1.4,.2);
+    this.tone(t+.07,.1,520,300,.12,'triangle');
+  },
+  check:function(){
+    if(!S.sound) return; var c=this.ensure(); if(!c) return;
+    var t=c.currentTime;
+    this.tone(t,.5,1046,null,.2,'triangle');
+    this.tone(t+.005,.5,1568,null,.1,'triangle');
+    this.tone(t+.16,.6,1318,null,.22,'triangle');
+    this.tone(t,.8,131,110,.22,'sine');
+  },
+  bad:function(){
+    if(!S.sound) return; var c=this.ensure(); if(!c) return;
+    var t=c.currentTime;
+    this.tone(t,.16,150,110,.22,'square');
+    this.nz(t,.1,300,.6,.12,'lowpass');
+  },
+  win:function(){
+    if(!S.sound) return; var c=this.ensure(); if(!c) return;
+    var t=c.currentTime, n=[523,587,659,784,880,1047,1319], i;
+    for(i=0;i<n.length;i++){
+      this.tone(t+i*.1,.75,n[i],null,.18,'triangle');
+      this.tone(t+i*.1,.5,n[i]*2,null,.05,'sine');
+    }
+    this.tone(t,1.6,196,null,.2,'sine');
+    this.nz(t,.5,900,.5,.1);
+  },
+  lose:function(){
+    if(!S.sound) return; var c=this.ensure(); if(!c) return;
+    var t=c.currentTime, n=[440,392,330,262], i;
+    for(i=0;i<n.length;i++) this.tone(t+i*.19,.9,n[i],null,.19,'sine');
+    this.tone(t,2,98,88,.22,'sine');
+  },
+  draw:function(){
+    if(!S.sound) return; var c=this.ensure(); if(!c) return;
+    var t=c.currentTime;
+    this.tone(t,.9,392,null,.17,'triangle'); this.tone(t+.18,1.1,392,null,.14,'triangle');
+  }
+};
+document.addEventListener('pointerdown',function(){ Sfx.unlock(); },{once:true});
+document.addEventListener('touchstart',function(){ Sfx.unlock(); },{once:true});
+
+/* ===== 木纹噪声贴图 ===== */
+(function(){
+  var cv=document.createElement('canvas'); cv.width=cv.height=150;
+  var g=cv.getContext('2d'), im=g.createImageData(150,150), d=im.data, i;
+  for(i=0;i<d.length;i+=4){
+    var v=200+Math.random()*55|0;
+    d[i]=d[i+1]=d[i+2]=v; d[i+3]=26+Math.random()*26|0;
+  }
+  g.putImageData(im,0,0);
+  try{ document.documentElement.style.setProperty('--noise','url('+cv.toDataURL()+')'); }catch(e){}
+})();
+
+/* ===== 棋盘绘制 ===== */
+var linesEl=$('#lines'), cellsEl=$('#cells'), piecesEl=$('#pieces'), marksEl=$('#marks'), fxEl=$('#fx');
+(function drawLines(){
+  var o=[];
+  function L(x1,y1,x2,y2,w){
+    o.push('<line class="ln" x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+
+      '" stroke-width="'+(w||1.3)+'" vector-effect="non-scaling-stroke"/>');
+  }
+  o.push('<rect class="ln bd" x="-.34" y="-.34" width="8.68" height="9.68" rx=".07" stroke-width="3" vector-effect="non-scaling-stroke"/>');
+  o.push('<rect class="ln" x="-.16" y="-.16" width="8.32" height="9.32" rx=".04" stroke-width="1.1" vector-effect="non-scaling-stroke"/>');
+  for(var y=0;y<=9;y++) L(0,y,8,y,y===0||y===9?1.9:1.3);
+  L(0,0,0,9,1.9); L(8,0,8,9,1.9);
+  for(var x=1;x<=7;x++){ L(x,0,x,4); L(x,5,x,9); }
+  L(3,0,5,2,1.5); L(5,0,3,2,1.5); L(3,7,5,9,1.5); L(5,7,3,9,1.5);
+  var pts=[[1,2],[7,2],[1,7],[7,7],[0,3],[2,3],[4,3],[6,3],[8,3],[0,6],[2,6],[4,6],[6,6],[8,6]];
+  for(var i=0;i<pts.length;i++){
+    var px=pts[i][0], py=pts[i][1], sx, sy, a, b;
+    for(a=-1;a<=1;a+=2) for(b=-1;b<=1;b+=2){
+      sx=px+a*.13; sy=py+b*.13;
+      if(sx<-.02||sx>8.02) continue;
+      L(sx,sy,sx+a*.2,sy,1.1); L(sx,sy,sx,sy+b*.2,1.1);
+    }
+  }
+  o.push('<text class="rv" x="1.9" y="4.7" font-size=".56" text-anchor="middle">楚 河</text>');
+  o.push('<text class="rv" x="6.1" y="4.7" font-size=".56" text-anchor="middle">汉 界</text>');
+  linesEl.innerHTML=o.join('');
+})();
+for(var yy=0;yy<10;yy++) for(var xx=0;xx<9;xx++){
+  var cd=document.createElement('div');
+  cd.className='cell'; cd.setAttribute('data-i',yy*9+xx);
+  cd.innerHTML='<span class="dot"></span><span class="ring"></span>';
+  cellsEl.appendChild(cd);
+}
+var CELLS=cellsEl.children;
+
+/* ===== 对手形象控制 ===== */
+var Av={
+  box:$('#avatarBox'), svg:$('#avatar'), bubble:$('#bubble'), mouth:$('#mouth'),
+  blinkTimer:null, sayTimer:null, state:'idle',
+  M:{
+    idle:'M147,119 Q160,126 173,119',
+    smile:'M143,116 Q160,134 177,116',
+    grin:'M142,114 Q160,138 178,114',
+    frown:'M147,127 Q160,113 173,127',
+    think:'M150,121 Q161,117 171,125',
+    oh:'M152,118 Q160,110 168,118 Q160,132 152,118'
+  },
+  look:function(lv){
+    var st=this.svg.style;
+    st.setProperty('--robe',lv.robe); st.setProperty('--robe-d',lv.robeD);
+    st.setProperty('--robe-l',lv.robeL); st.setProperty('--hair',lv.hair);
+    this.box.classList.toggle('hasBeard',!!lv.beard);
+    this.box.classList.toggle('hasSpecs',!!lv.specs);
+  },
+  set:function(st){
+    this.state=st;
+    var c=this.box.classList;
+    c.remove('think','happy','sad');
+    if(st==='think'){ c.add('think'); this.mouth.setAttribute('d',this.M.think); }
+    else if(st==='happy'){ c.add('happy'); this.mouth.setAttribute('d',this.M.grin); }
+    else if(st==='sad'){ c.add('sad'); this.mouth.setAttribute('d',this.M.frown); }
+    else if(st==='oh'){ this.mouth.setAttribute('d',this.M.oh); }
+    else this.mouth.setAttribute('d',this.M.idle);
+  },
+  reach:function(){
+    var c=this.box.classList; c.add('reach');
+    var self=this; setTimeout(function(){ c.remove('reach'); },620);
+  },
+  say:function(txt,ms){
+    if(!txt) return;
+    this.bubble.textContent=txt; this.bubble.classList.add('show');
+    clearTimeout(this.sayTimer);
+    var self=this;
+    this.sayTimer=setTimeout(function(){ self.bubble.classList.remove('show'); }, ms||2600);
+  },
+  hush:function(){ this.bubble.classList.remove('show'); },
+  startBlink:function(){
+    var self=this;
+    function loop(){
+      var d=1600+Math.random()*4200;
+      self.blinkTimer=setTimeout(function(){
+        self.box.classList.add('blink');
+        setTimeout(function(){
+          self.box.classList.remove('blink');
+          if(Math.random()<.25){
+            setTimeout(function(){
+              self.box.classList.add('blink');
+              setTimeout(function(){ self.box.classList.remove('blink'); },90);
+            },150);
+          }
+        },100);
+        loop();
+      },d);
+    }
+    loop();
+  }
+};
+Av.startBlink();
+
+var TALK={
+  start:['请多指教。','来，摆上棋。','我可不会让子哦。','今天手气不错。'],
+  ok:['嗯……','有点意思。','接着来。','我看看。'],
+  eatMine:['这子我收了。','承让。','哈，吃一个。','你这子送我了？'],
+  eatYours:['哎，被你吃了。','好棋，是我疏忽。','这步算你狠。'],
+  iCheck:['将！','将军，小心了。','看将！'],
+  uCheck:['哎呀，让我想想……','这步厉害。','别急，我有办法。'],
+  longThink:['这局有点复杂……','让我算一算。','嗯……难办。'],
+  win:['承让了，再来一局？','棋力不错，可惜差一点。','哈哈，这盘我赢了。'],
+  lose:['好棋！佩服佩服。','我输了，心服口服。','高手，再来一盘？'],
+  draw:['和棋，势均力敌。','这局打成了平手。'],
+  undo:['想清楚再走嘛。','行，让你改一次。','年轻人就是性急。']
+};
+function talk(key){
+  if(S.mode!=='ai') return;
+  var a=TALK[key]; if(!a) return;
+  Av.say(a[Math.floor(Math.random()*a.length)]);
+}
+
+/* ===== 对局状态 ===== */
+var G={
+  bd:null, stm:0, objAt:[], hist:[], hashes:[], noCap:0,
+  over:null, sel:-1, selMoves:[], caps:[[],[]], times:[0,0],
+  busy:false, aiBusy:false, started:false, lastTick:0, capCount:0
+};
+var ui={
+  oppName:$('#oppName'), oppTitle:$('#oppTitle'), oppClock:$('#oppClock'), oppTray:$('#oppTray'),
+  meName:$('#meName'), meTitle:$('#meTitle'), meClock:$('#meClock'), meTray:$('#meTray'),
+  oppPlate:$('#oppPlate'), mePlate:$('#mePlate'), thinking:$('#thinking'),
+  log:$('#log'), toast:$('#toast'), flash:$('#flash'), board:$('#board'), persp:$('#persp'),
+  stMove:$('#stMove'), stCap:$('#stCap'), stNodes:$('#stNodes'), badge:$('#modeBadge')
+};
+
+function dcoord(i){ var x=i%9, y=(i-x)/9; return S.flip?[8-x,9-y]:[x,y]; }
+function setPos(el,i){ var p=dcoord(i); el.style.setProperty('--px',p[0]); el.style.setProperty('--py',p[1]); }
+function noAnim(fn){
+  document.body.classList.add('noanim'); fn();
+  void document.body.offsetHeight;
+  setTimeout(function(){ document.body.classList.remove('noanim'); },40);
+}
+function refreshOrient(){
+  var i,p;
+  for(i=0;i<90;i++){
+    p=dcoord(i);
+    CELLS[i].style.setProperty('--cx',p[0]); CELLS[i].style.setProperty('--cy',p[1]);
+    if(G.objAt[i]) setPos(G.objAt[i].el,i);
+  }
+  var mk=marksEl.children;
+  for(i=0;i<mk.length;i++){
+    var mi=+mk[i].getAttribute('data-i'); p=dcoord(mi);
+    mk[i].style.setProperty('--mx',p[0]); mk[i].style.setProperty('--my',p[1]);
+  }
+}
+function layout(){
+  var area=$('#boardArea'), w=area.clientWidth-8, h=area.clientHeight-8;
+  if(w<=0||h<=0) return;
+  var c=Math.floor(Math.min(w/9.32, h/10.5));
+  c=Math.max(22,Math.min(96,c));
+  document.documentElement.style.setProperty('--cell',c+'px');
+}
+
+/* ===== 棋子对象 ===== */
+function newPiece(code,i){
+  var el=document.createElement('div');
+  el.className='piece '+(code>8?'blk':'red')+' born';
+  el.innerHTML='<i></i><b>'+XQ.CHAR[code]+'</b>';
+  setPos(el,i);
+  piecesEl.appendChild(el);
+  setTimeout(function(){ el.classList.remove('born'); },320);
+  return {code:code, el:el, i:i};
+}
+function clearBoardDom(){
+  piecesEl.innerHTML=''; marksEl.innerHTML=''; fxEl.innerHTML='';
+  ui.oppTray.innerHTML=''; ui.meTray.innerHTML='';
+}
+
+/* ===== 选中 / 提示点 ===== */
+function clearSel(){
+  if(G.sel>=0 && G.objAt[G.sel]) G.objAt[G.sel].el.classList.remove('sel');
+  G.sel=-1; G.selMoves=[];
+  for(var i=0;i<90;i++){ CELLS[i].classList.remove('can','eat'); }
+}
+function select(i){
+  clearSel();
+  G.sel=i; G.objAt[i].el.classList.add('sel');
+  var all=XQ.legalMoves(G.bd,G.stm), j;
+  G.selMoves=[];
+  for(j=0;j<all.length;j++) if((all[j]>>7)===i){
+    var to=all[j]&127; G.selMoves.push(to);
+    CELLS[to].classList.add(G.bd[to]?'eat':'can');
+  }
+  Sfx.tick();
+}
+function setMarks(from,to){
+  marksEl.innerHTML='';
+  [from,to].forEach(function(i){
+    var d=document.createElement('div');
+    d.className='mark'; d.setAttribute('data-i',i);
+    var p=dcoord(i);
+    d.style.setProperty('--mx',p[0]); d.style.setProperty('--my',p[1]);
+    d.innerHTML='<span></span><span></span><span></span><span></span>';
+    marksEl.appendChild(d);
+  });
+}
+function showHintMark(from,to){
+  [from,to].forEach(function(i){
+    var d=document.createElement('div');
+    d.className='mark hint'; d.setAttribute('data-i',i);
+    var p=dcoord(i);
+    d.style.setProperty('--mx',p[0]); d.style.setProperty('--my',p[1]);
+    d.innerHTML='<span></span><span></span><span></span><span></span>';
+    marksEl.appendChild(d);
+    setTimeout(function(){ if(d.parentNode) d.parentNode.removeChild(d); },2600);
+  });
+}
+
+/* ===== 特效 ===== */
+function spark(i){
+  var p=dcoord(i), d=document.createElement('div');
+  d.className='spark';
+  d.style.setProperty('--fx',p[0]); d.style.setProperty('--fy',p[1]);
+  var h='<div class="wave"></div>', k;
+  for(k=0;k<10;k++){
+    var a=Math.PI*2*k/10+Math.random()*.5, r=38+Math.random()*34;
+    h+='<div class="p" style="--dx:'+(Math.cos(a)*r).toFixed(1)+'px;--dy:'+(Math.sin(a)*r).toFixed(1)+
+       'px;animation-delay:'+(Math.random()*.06).toFixed(3)+'s"></div>';
+  }
+  d.innerHTML=h; fxEl.appendChild(d);
+  setTimeout(function(){ if(d.parentNode) d.parentNode.removeChild(d); },800);
+}
+function shake(){
+  ui.persp.classList.remove('shake');
+  void ui.persp.offsetWidth;
+  ui.persp.classList.add('shake');
+  setTimeout(function(){ ui.persp.classList.remove('shake'); },400);
+}
+function toast(t){
+  ui.toast.textContent=t;
+  ui.toast.classList.remove('show'); void ui.toast.offsetWidth;
+  ui.toast.classList.add('show');
+}
+function flash(){
+  ui.flash.classList.remove('on'); void ui.flash.offsetWidth;
+  ui.flash.classList.add('on');
+}
+function markCheck(on){
+  var i;
+  for(i=0;i<90;i++) if(G.objAt[i]) G.objAt[i].el.classList.remove('chk');
+  if(on){
+    for(i=0;i<90;i++) if(G.bd[i]===(1|(G.stm<<3))) { if(G.objAt[i]) G.objAt[i].el.classList.add('chk'); }
+  }
+}
+
+/* ===== 吃子托盘 ===== */
+function addChip(side,code){
+  var tray = (side===(S.mode==='pvp'?0:S.mySide)) ? ui.meTray : ui.oppTray;
+  var c=document.createElement('span');
+  c.className='tchip '+(code>8?'b':'r');
+  c.textContent=XQ.CHAR[code];
+  tray.appendChild(c);
+}
+function rebuildTrays(){
+  ui.meTray.innerHTML=''; ui.oppTray.innerHTML='';
+  var mine=(S.mode==='pvp'?0:S.mySide);
+  [0,1].forEach(function(s){
+    G.caps[s].forEach(function(code){
+      var c=document.createElement('span');
+      c.className='tchip '+(code>8?'b':'r');
+      c.textContent=XQ.CHAR[code];
+      (s===mine?ui.meTray:ui.oppTray).appendChild(c);
+    });
+  });
+}
+
+/* ===== 棋谱 ===== */
+function renderLog(){
+  var h='', i;
+  if(!G.hist.length){ ui.log.innerHTML='<div class="empty">尚无着法</div>'; return; }
+  for(i=0;i<G.hist.length;i+=2){
+    var n=(i/2|0)+1;
+    var a=G.hist[i], b=G.hist[i+1];
+    h+='<div class="lrow'+(i+2>=G.hist.length?' last':'')+'"><span class="n">'+n+'.</span>'+
+       '<span class="m r">'+(a?a.notation:'')+'</span>'+
+       '<span class="m b">'+(b?b.notation:'')+'</span></div>';
+  }
+  ui.log.innerHTML=h;
+  ui.log.scrollTop=ui.log.scrollHeight;
+}
+
+/* ===== 名牌 / 时钟 ===== */
+function fmt(ms){
+  var s=Math.floor(ms/1000), m=Math.floor(s/60);
+  s=s%60;
+  return (m<10?'0':'')+m+':'+(s<10?'0':'')+s;
+}
+function updatePlates(){
+  var lv=LEVELS[S.level];
+  var mine=(S.mode==='pvp'?0:S.mySide), theirs=mine^1;
+  ui.badge.textContent = S.mode==='ai' ? '人机对战 · '+lv.title.split(' ')[0] : '双人对战';
+  if(S.mode==='ai'){
+    ui.oppName.textContent=lv.name; ui.oppTitle.textContent=lv.title+' · '+(theirs?'黑方':'红方');
+    ui.meName.textContent='我'; ui.meTitle.textContent=(mine?'黑方 · 后行':'红方 · 先行');
+  }else{
+    ui.oppName.textContent='玩家二'; ui.oppTitle.textContent='黑方 · 后行';
+    ui.meName.textContent='玩家一'; ui.meTitle.textContent='红方 · 先行';
+  }
+  ui.oppPlate.className='plate '+(theirs?'black':'red')+(G.stm===theirs&&!G.over?' active':'');
+  ui.mePlate.className='plate '+(mine?'black':'red')+(G.stm===mine&&!G.over?' active':'');
+  ui.oppClock.textContent=fmt(G.times[theirs]);
+  ui.meClock.textContent=fmt(G.times[mine]);
+  ui.stMove.textContent=Math.floor(G.hist.length/2)+1;
+  ui.stCap.textContent=G.capCount;
+  $('#btnUndo').disabled=!G.hist.length||G.aiBusy;
+  $('#btnHint').disabled=G.aiBusy||!!G.over||G.busy;
+}
+setInterval(function(){
+  if(!G.started||G.over) { G.lastTick=Date.now(); return; }
+  var now=Date.now();
+  if(G.lastTick) G.times[G.stm]+=now-G.lastTick;
+  G.lastTick=now;
+  var mine=(S.mode==='pvp'?0:S.mySide);
+  ui.oppClock.textContent=fmt(G.times[mine^1]);
+  ui.meClock.textContent=fmt(G.times[mine]);
+},300);
+
+/* ===== 开新局 ===== */
+function newGame(){
+  G.bd=Int8Array.from(XQ.START);
+  G.stm=0; G.objAt=new Array(90); G.hist=[]; G.hashes=[]; G.noCap=0;
+  G.over=null; G.sel=-1; G.selMoves=[]; G.caps=[[],[]]; G.times=[0,0];
+  G.busy=false; G.aiBusy=false; G.capCount=0; G.lastTick=Date.now();
+  S.flip = (S.mode==='ai' && S.mySide===1);
+  clearBoardDom();
+  noAnim(function(){
+    refreshOrient();
+    for(var i=0;i<90;i++) if(G.bd[i]) G.objAt[i]=newPiece(G.bd[i],i);
+  });
+  G.hashes.push(XQ.hashOf(G.bd,0));
+  G.started=true;
+  renderLog(); updatePlates(); markCheck(false);
+  ui.thinking.classList.remove('on');
+  ui.stNodes.textContent='—';
+  Av.look(LEVELS[S.level]); Av.set('idle'); Av.hush();
+  layout();
+  if(S.mode==='ai'){
+    setTimeout(function(){ if(G.started) talk('start'); },600);
+    if(G.stm!==S.mySide) setTimeout(aiTurn,1100);
+  }
+}
+
+/* ===== 走子 ===== */
+function animateMove(obj,to,victim){
+  return new Promise(function(res){
+    var el=obj.el;
+    el.style.transitionDuration='.13s';
+    el.classList.add('lift');
+    el.style.setProperty('--pz','calc(var(--cell)*.55)');
+    el.style.setProperty('--ps','1.08');
+    setTimeout(function(){
+      el.style.transitionDuration='.29s';
+      setPos(el,to);
+      setTimeout(function(){
+        el.style.transitionDuration='.12s';
+        el.style.setProperty('--pz','0px');
+        el.style.setProperty('--ps','1');
+        if(victim){
+          victim.el.classList.add('die');
+          var v=victim.el;
+          setTimeout(function(){ if(v.parentNode) v.parentNode.removeChild(v); },400);
+          Sfx.capture(); shake(); spark(to);
+        }else{
+          Sfx.knock(1,.95+Math.random()*.12);
+        }
+        setTimeout(function(){
+          el.classList.remove('lift');
+          el.style.transitionDuration='';
+          res();
+        },140);
+      },290);
+    },130);
+  });
+}
+
+function doMove(from,to,byAI){
+  if(G.busy||G.over) return Promise.resolve();
+  var obj=G.objAt[from], victim=G.objAt[to]||null;
+  if(!obj||from<0||from>89||to<0||to>89){ clearSel(); return Promise.resolve(); }
+  G.busy=true;
+  var m=(from<<7)|to, capCode=G.bd[to], mover=G.stm;
+  var notation=XQ.moveName(G.bd,m);
+  G.hist.push({m:m,cap:capCode,capObj:victim,obj:obj,noCap:G.noCap,notation:notation,side:mover});
+  G.bd[to]=G.bd[from]; G.bd[from]=0;
+  G.objAt[to]=obj; G.objAt[from]=null; obj.i=to;
+  if(capCode){ G.noCap=0; G.caps[mover].push(capCode); G.capCount++; addChip(mover,capCode); }
+  else G.noCap++;
+  clearSel(); setMarks(from,to);
+  Av.hush();
+  return animateMove(obj,to,victim).then(function(){
+    G.stm=mover^1;
+    G.hashes.push(XQ.hashOf(G.bd,G.stm));
+    G.busy=false;
+    afterMove(capCode,mover,byAI);
+  })['catch'](function(){ G.busy=false; });
+}
+
+function afterMove(capCode,mover,byAI){
+  renderLog();
+  var inChk=XQ.inCheck(G.bd,G.stm);
+  var moves=XQ.legalMoves(G.bd,G.stm);
+  markCheck(inChk);
+  updatePlates();
+
+  if(moves.length===0){
+    gameOver(mover, inChk?'绝杀':'困毙');
+    return;
+  }
+  if(inChk){
+    Sfx.check(); toast('将 军'); flash();
+    if(S.mode==='ai'){
+      if(byAI){ Av.set('happy'); talk('iCheck'); setTimeout(function(){ if(!G.over) Av.set('idle'); },1800); }
+      else { Av.set('sad'); talk('uCheck'); }
+    }
+  }else if(S.mode==='ai'){
+    if(capCode){
+      if(byAI){ Av.set('happy'); talk('eatMine'); }
+      else { Av.set('sad'); talk('eatYours'); }
+      setTimeout(function(){ if(!G.over&&Av.state!=='think') Av.set('idle'); },1900);
+    }else if(!byAI && Math.random()<.22){ talk('ok'); }
+  }
+  if(G.noCap>=120){ gameOver(-1,'自然限着和棋'); return; }
+  var h=G.hashes[G.hashes.length-1], c=0, i;
+  for(i=0;i<G.hashes.length;i++) if(G.hashes[i]===h) c++;
+  if(c>=3){ gameOver(-1,'三次重复局面'); return; }
+  if(G.hashes.length>8 && onlyKings()){ gameOver(-1,'双方无子力'); return; }
+
+  if(S.mode==='ai' && G.stm!==S.mySide && !G.over) setTimeout(aiTurn,160);
+}
+function onlyKings(){
+  for(var i=0;i<90;i++){ var p=G.bd[i]; if(p && (p&7)!==1 && (p&7)!==2 && (p&7)!==3) return false; }
+  return true;
+}
+
+/* ===== AI 行棋 ===== */
+function aiTurn(){
+  if(G.over||S.mode!=='ai'||G.aiBusy||!G.started) return;
+  var lv=LEVELS[S.level];
+  G.aiBusy=true; updatePlates();
+  ui.thinking.classList.add('on');
+  Av.set('think');
+  var longT=setTimeout(function(){ talk('longThink'); }, Math.max(900,lv.min+500));
+  var t0=Date.now();
+  askEngine(G.bd,G.stm,lv.depth,lv.time,G.hashes.slice(-16)).then(function(r){
+    clearTimeout(longT);
+    var wait=Math.max(0,lv.min-(Date.now()-t0));
+    return sleep(wait).then(function(){ return r; });
+  }).then(function(r){
+    ui.thinking.classList.remove('on');
+    Av.set('idle');
+    G.aiBusy=false;
+    if(G.over) { updatePlates(); return; }
+    var mv=r.move;
+    if(lv.rand>0 && r.list && r.list.length>1 && Math.random()<lv.rand){
+      var top=r.list[0].s, cand=r.list.filter(function(e){ return top-e.s<=160; });
+      if(cand.length>1) mv=cand[Math.floor(Math.random()*cand.length)].m;
+    }
+    if(r.nodes) ui.stNodes.textContent = r.nodes>9999 ? Math.round(r.nodes/1000)+'k' : r.nodes;
+    if(!mv){ gameOver(G.stm^1,'无着可走'); return; }
+    Av.reach();
+    setTimeout(function(){ doMove(mv>>7,mv&127,true); },180);
+  })['catch'](function(){
+    clearTimeout(longT);
+    ui.thinking.classList.remove('on'); G.aiBusy=false; Av.set('idle');
+    var ms=XQ.legalMoves(G.bd,G.stm);
+    if(ms.length){ var mv2=ms[Math.floor(Math.random()*ms.length)]; doMove(mv2>>7,mv2&127,true); }
+  });
+}
+
+/* ===== 点击处理 ===== */
+function onTap(i){
+  if(G.over||G.busy) return;
+  if(!G.started) return;
+  if(S.mode==='ai' && (G.stm!==S.mySide||G.aiBusy)) return;
+  var p=G.bd[i];
+  if(G.sel>=0 && G.selMoves.indexOf(i)>=0){ doMove(G.sel,i,false); return; }
+  if(p && ((p>>3)&1)===G.stm){ select(i); return; }
+  if(p){
+    var o=G.objAt[i];
+    if(o){ o.el.classList.remove('nono'); void o.el.offsetWidth; o.el.classList.add('nono');
+      setTimeout(function(){ o.el.classList.remove('nono'); },460); }
+    Sfx.bad();
+    return;
+  }
+  if(G.sel>=0){ Sfx.bad(); clearSel(); }
+}
+var pdSeen=false;
+function tapFrom(e){
+  var t=e.target;
+  while(t&&t!==cellsEl&&!(t.getAttribute&&t.getAttribute('data-i'))) t=t.parentNode;
+  if(!t||t===cellsEl) return;
+  if(e.cancelable) e.preventDefault();
+  onTap(+t.getAttribute('data-i'));
+}
+cellsEl.addEventListener('pointerdown',function(e){ pdSeen=true; tapFrom(e); });
+cellsEl.addEventListener('click',function(e){ if(pdSeen){ pdSeen=false; return; } tapFrom(e); });
+
+/* ===== 悔棋 / 提示 ===== */
+function undoOne(){
+  var h=G.hist.pop(); if(!h) return;
+  var from=h.m>>7, to=h.m&127;
+  G.bd[from]=G.bd[to]; G.bd[to]=h.cap;
+  G.objAt[from]=h.obj; G.objAt[to]=h.capObj||null;
+  h.obj.i=from;
+  noAnim(function(){ setPos(h.obj.el,from); });
+  if(h.capObj){
+    var o=h.capObj;
+    o.el.classList.remove('die');
+    if(!o.el.parentNode) piecesEl.appendChild(o.el);
+    noAnim(function(){ setPos(o.el,to); });
+    o.i=to;
+    G.caps[h.side].pop(); G.capCount--;
+  }
+  G.noCap=h.noCap; G.stm=h.side; G.hashes.pop();
+  G.over=null;
+}
+function undo(){
+  if(G.busy||G.aiBusy||!G.hist.length) return;
+  G.lastTick=Date.now();
+  clearSel();
+  var steps=1;
+  if(S.mode==='ai'){
+    steps = (G.hist.length>=2) ? 2 : 1;
+    if(G.hist[G.hist.length-1].side===S.mySide) steps=1;
+  }
+  for(var k=0;k<steps;k++) undoOne();
+  rebuildTrays();
+  marksEl.innerHTML='';
+  if(G.hist.length){ var l=G.hist[G.hist.length-1]; setMarks(l.m>>7,l.m&127); }
+  markCheck(XQ.inCheck(G.bd,G.stm));
+  renderLog(); updatePlates();
+  Sfx.tick();
+  $('#veil').classList.remove('show');
+  if(S.mode==='ai'){ Av.set('idle'); talk('undo'); }
+}
+function hint(){
+  if(G.busy||G.aiBusy||G.over) return;
+  $('#btnHint').disabled=true;
+  askEngine(G.bd,G.stm,4,800,[]).then(function(r){
+    updatePlates();
+    if(r.move){ showHintMark(r.move>>7,r.move&127); Sfx.tick(); }
+  });
+}
+
+/* ===== 终局 ===== */
+function gameOver(winner,way){
+  if(G.over) return;
+  G.over={winner:winner,way:way};
+  clearSel(); updatePlates();
+  var mine=(S.mode==='pvp'?0:S.mySide);
+  var iWin = winner===mine;
+  var ttl, icon, sub;
+  if(winner===-1){ ttl='和 棋'; icon='🤝'; }
+  else if(S.mode==='pvp'){ ttl=(winner===0?'红 方 胜':'黑 方 胜'); icon='🏆'; }
+  else { ttl=iWin?'你 胜 了':'你 输 了'; icon=iWin?'🏆':'😵'; }
+  setTimeout(function(){
+    if(winner===-1){ Sfx.draw(); if(S.mode==='ai'){Av.set('idle');talk('draw');} }
+    else if(S.mode==='pvp'){ Sfx.win(); }
+    else if(iWin){ Sfx.win(); Av.set('sad'); talk('lose'); }
+    else { Sfx.lose(); Av.set('happy'); talk('win'); }
+    toast(winner===-1?'和 棋':(S.mode==='pvp'?ttl:(iWin?'胜':'负')));
+  },420);
+  setTimeout(function(){
+    $('#resIcon').textContent=icon;
+    $('#resTitle').textContent=ttl;
+    $('#resWay').textContent=way;
+    var tot=fmt(G.times[0]+G.times[1]);
+    $('#resSub').innerHTML='共走 <b>'+G.hist.length+'</b> 着 · 用时 <b>'+tot+'</b> · 吃子 <b>'+G.capCount+'</b>'+
+      (S.mode==='ai'?'<br>对手：<b>'+LEVELS[S.level].name+'</b>（'+LEVELS[S.level].title+'）':'');
+    $('#menuSheet').style.display='none';
+    $('#resSheet').style.display='';
+    $('#veil').classList.add('show');
+  },1500);
+}
+
+/* ===== 控件 ===== */
+function segPick(wrap,attr,val){
+  var bs=wrap.children,i;
+  for(i=0;i<bs.length;i++) bs[i].classList.toggle('on', bs[i].getAttribute(attr)===String(val));
+}
+function buildLevels(wrap,cls){
+  var h='',i;
+  for(i=0;i<LEVELS.length;i++)
+    h+='<button data-lv="'+i+'" class="'+(i===S.level?'on':'')+'">'+LEVELS[i].name+'<em>'+LEVELS[i].title+'</em></button>';
+  wrap.innerHTML=h;
+  wrap.addEventListener('click',function(e){
+    var t=e.target; while(t&&t!==wrap&&!t.getAttribute('data-lv')) t=t.parentNode;
+    if(!t||t===wrap) return;
+    S.level=+t.getAttribute('data-lv'); save();
+    segPick($('#segLevel'),'data-lv',S.level); segPick($('#mLevel'),'data-lv',S.level);
+    Av.look(LEVELS[S.level]); updatePlates();
+    if(G.started&&S.mode==='ai'){ Av.set('idle'); Av.say(LEVELS[S.level].name+'：请多指教。'); }
+  });
+}
+buildLevels($('#segLevel')); buildLevels($('#mLevel'));
+
+$('#segMode').addEventListener('click',function(e){
+  var m=e.target.getAttribute('data-mode'); if(!m) return;
+  S.mode=m; save(); syncControls(); newGame();
+});
+$('#segSide').addEventListener('click',function(e){
+  var s=e.target.getAttribute('data-side'); if(s===null) return;
+  S.mySide=+s; save(); syncControls(); newGame();
+});
+$('#mMode').addEventListener('click',function(e){
+  var t=e.target; while(t&&!t.getAttribute('data-mode')) t=t.parentNode;
+  if(!t) return;
+  S.mode=t.getAttribute('data-mode'); save(); syncControls();
+});
+$('#mSide').addEventListener('click',function(e){
+  var s=e.target.getAttribute('data-side'); if(s===null) return;
+  S.mySide=+s; save(); syncControls();
+});
+function syncControls(){
+  segPick($('#segMode'),'data-mode',S.mode);
+  segPick($('#segSide'),'data-side',S.mySide);
+  segPick($('#mSide'),'data-side',S.mySide);
+  segPick($('#segLevel'),'data-lv',S.level);
+  segPick($('#mLevel'),'data-lv',S.level);
+  var mc=$('#mMode').children,i;
+  for(i=0;i<mc.length;i++) mc[i].classList.toggle('on',mc[i].getAttribute('data-mode')===S.mode);
+  var ai=S.mode==='ai';
+  $('#lvCard').style.display=ai?'':'none';
+  $('#mLvGrp').style.display=ai?'':'none';
+  $('#mSideGrp').style.display=ai?'':'none';
+  $('#avatarBox').style.opacity=1;
+  $('#btnSound').classList.toggle('off',!S.sound);
+  $('#btnSound').textContent=S.sound?'🔊':'🔇';
+  updatePlates();
+}
+$('#btnNew').addEventListener('click',function(){ newGame(); });
+$('#btnUndo').addEventListener('click',undo);
+$('#btnHint').addEventListener('click',hint);
+function doFlip(){ S.flip=!S.flip; noAnim(refreshOrient); Sfx.tick(); }
+$('#btnFlip').addEventListener('click',doFlip);
+$('#btnFlip2').addEventListener('click',doFlip);
+$('#btnSound').addEventListener('click',function(){
+  S.sound=!S.sound; save(); syncControls();
+  if(S.sound){ Sfx.unlock(); Sfx.knock(); }
+});
+$('#btnMenu').addEventListener('click',function(){
+  $('#resSheet').style.display='none';
+  $('#menuSheet').style.display='';
+  $('#veil').classList.add('show');
+});
+$('#btnStart').addEventListener('click',function(){
+  Sfx.unlock();
+  $('#veil').classList.remove('show');
+  syncControls(); newGame();
+});
+$('#btnAgain').addEventListener('click',function(){
+  $('#veil').classList.remove('show');
+  newGame();
+});
+$('#btnReview').addEventListener('click',function(){ $('#veil').classList.remove('show'); });
+$('#veil').addEventListener('click',function(e){
+  if(e.target===$('#veil') && G.started){ $('#veil').classList.remove('show'); }
+});
+document.addEventListener('keydown',function(e){
+  if(e.key==='u'||e.key==='U') undo();
+  else if(e.key==='h'||e.key==='H') hint();
+  else if(e.key==='n'||e.key==='N') newGame();
+  else if(e.key==='Escape') $('#veil').classList.remove('show');
+});
+
+/* ===== 启动 ===== */
+window.addEventListener('resize',function(){ noAnim(layout); });
+if(window.ResizeObserver){
+  new ResizeObserver(function(){ noAnim(layout); }).observe($('#boardArea'));
+}
+syncControls();
+Av.look(LEVELS[S.level]);
+newGame();
+G.started=false;
+layout();
+setTimeout(function(){ layout(); $('#veil').classList.add('show'); },60);
+window.__xq={G:G,S:S,XQ:XQ,newGame:newGame,doMove:doMove,LEVELS:LEVELS};
+})();
+</script>
+</body>
+</html>

@@ -2,7 +2,7 @@
 
 一个**单文件**的中国象棋网页游戏：整个游戏就是一个 `index.html`，不依赖任何图片、音频、字体或第三方库，双击即可在电脑、平板、手机的浏览器里运行。
 
-🎮 **在线试玩**：<!-- PAGES_URL -->（开启 GitHub Pages 后可用）
+🎮 **在线试玩**：https://tenson2zhang.github.io/xiangqi/
 
 ---
 

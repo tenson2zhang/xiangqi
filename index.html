@@ -245,6 +245,45 @@ button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer
 @keyframes markIn{from{opacity:0;transform:scale(1.4)}to{opacity:1;transform:none}}
 @keyframes hintBlink{0%,100%{opacity:1}50%{opacity:.3}}
 
+/* 上一步轨迹 */
+#trace{position:absolute;inset:0;width:100%;height:100%;overflow:visible;display:block;pointer-events:none}
+#trace .halo{fill:none;stroke:rgba(255,250,232,.62);stroke-width:.2;stroke-linecap:round;stroke-linejoin:round}
+#trace .hh{fill:rgba(255,250,232,.62);stroke:rgba(255,250,232,.62);stroke-width:.13;stroke-linejoin:round}
+#trace .ln2{
+  fill:none;stroke-width:.085;stroke-linecap:round;stroke-linejoin:round;
+  stroke-dasharray:.3 .18;animation:trFlow 1.15s linear infinite;
+}
+@keyframes trFlow{from{stroke-dashoffset:.48}to{stroke-dashoffset:0}}
+#trace .draw{
+  fill:none;stroke-width:.11;stroke-linecap:round;stroke-linejoin:round;
+  stroke-dasharray:var(--len);stroke-dashoffset:var(--len);
+  animation:trDraw .62s cubic-bezier(.3,.8,.3,1) forwards;
+}
+@keyframes trDraw{0%{stroke-dashoffset:var(--len);opacity:1}72%{stroke-dashoffset:0;opacity:1}100%{stroke-dashoffset:0;opacity:0}}
+#trace .org{stroke:rgba(255,250,232,.7);stroke-width:.05}
+#trace .head{stroke-linejoin:round}
+#trace .r .ln2,#trace .r .draw{stroke:#cc2a1e}
+#trace .r .head,#trace .r .org{fill:#cc2a1e}
+#trace .b .ln2,#trace .b .draw{stroke:#20426e}
+#trace .b .head,#trace .b .org{fill:#20426e}
+.noanim #trace .draw{animation:none;opacity:0}
+/* 起点残影：提示对方动的是哪个子 */
+.ghostp{
+  position:absolute;width:calc(var(--cell)*.84);height:calc(var(--cell)*.84);
+  left:calc(var(--mx) * var(--cell));top:calc(var(--my) * var(--cell));
+  margin:calc(var(--cell)*-.42) 0 0 calc(var(--cell)*-.42);
+  border-radius:50%;display:grid;place-items:center;
+  border:calc(var(--cell)*.03) dashed rgba(96,60,24,.4);
+  background:radial-gradient(circle,rgba(255,244,214,.34),rgba(255,240,204,.04) 72%);
+  animation:markIn .3s ease both;
+}
+.ghostp b{
+  font-family:var(--serif);font-weight:700;line-height:1;opacity:.52;
+  font-size:calc(var(--cell)*.38);
+}
+.ghostp.r b{color:var(--red-pc)}
+.ghostp.b b{color:var(--blk-pc)}
+
 /* ============ 棋子 ============ */
 .piece{
   position:absolute;left:0;top:0;
@@ -426,6 +465,11 @@ button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer
   background:linear-gradient(rgba(190,40,34,.65),rgba(140,22,20,.55));
   border-color:rgba(255,120,90,.35);color:#ffe6d8;
 }
+.acts button.on{
+  background:linear-gradient(rgba(216,178,101,.3),rgba(216,178,101,.13));
+  border-color:rgba(216,178,101,.6);color:#ffeec4;
+  box-shadow:0 2px 10px rgba(216,178,101,.22), inset 0 1px 0 rgba(255,255,255,.14);
+}
 #logCard{flex:1 1 auto;min-height:60px;display:flex;flex-direction:column;overflow:hidden}
 #log{
   flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;
@@ -441,6 +485,26 @@ button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer
 #log .empty{color:#6b5c44;font-size:12px;text-align:center;padding:14px 0}
 #stat{display:flex;gap:10px;font-size:11px;color:#9b8a68;flex-wrap:wrap}
 #stat b{color:#d9c69e;font-weight:600}
+#lastWrap{display:flex;align-items:center;gap:8px}
+#lastMove{flex:1 1 auto;display:flex;align-items:center;gap:7px;min-width:0}
+#lastMove .who{
+  flex:0 0 auto;width:21px;height:21px;border-radius:50%;display:grid;place-items:center;
+  font-family:var(--serif);font-size:12px;
+}
+#lastMove .who.r{background:rgba(190,40,34,.32);border:1px solid rgba(255,120,90,.4);color:#ffd9cc}
+#lastMove .who.b{background:rgba(38,68,108,.4);border:1px solid rgba(120,170,230,.34);color:#cfe2f7}
+#lastMove .mv{
+  font-family:var(--serif);font-size:14.5px;color:#f0dcb0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+#lastMove .cap{flex:0 0 auto;font-size:10.5px;color:#e39b8c}
+#lastMove.none{color:#6b5c44;font-size:12px}
+#btnReplay{
+  flex:0 0 auto;padding:6px 10px;border-radius:8px;font-size:11.5px;color:#c9bb9d;
+  background:rgba(0,0,0,.26);border:1px solid rgba(255,255,255,.07);transition:all .18s;
+}
+#btnReplay:active{transform:scale(.95)}
+#btnReplay:disabled{opacity:.35}
 
 /* ============ 遮罩 / 菜单 ============ */
 #veil{
@@ -508,8 +572,9 @@ button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer
   #panel .seg.col button{padding:8px 10px;font-size:12px}
   #panel .seg.col button em{display:none}
   #panel .seg button{padding:8px 10px;white-space:nowrap}
-  #panel .acts{grid-template-columns:repeat(4,auto)}
+  #panel .acts{grid-template-columns:repeat(5,auto)}
   #panel .acts button{padding:8px 11px;white-space:nowrap}
+  #lastCard{min-width:142px}
   #logCard{flex:1 1 150px;min-width:130px;max-width:46vw}
   #log{max-height:40px;overflow-x:auto;overflow-y:hidden;white-space:nowrap;line-height:1.3}
   #log .lrow{display:inline-flex;margin-right:12px;padding:0}
@@ -774,6 +839,7 @@ button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer
           <div id="boardGlow"></div>
           <div id="grid">
             <svg id="lines" viewBox="0 0 8 9" preserveAspectRatio="none"></svg>
+            <svg id="trace" viewBox="0 0 8 9" preserveAspectRatio="none"></svg>
             <div id="marks"></div>
             <div id="cells"></div>
             <div id="pieces"></div>
@@ -826,6 +892,14 @@ button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer
         <button id="btnUndo">悔棋</button>
         <button id="btnHint">提示</button>
         <button id="btnFlip2">翻转</button>
+        <button id="btnTrace" title="显示/隐藏对方上一步轨迹">轨迹</button>
+      </div>
+    </div>
+    <div class="card" id="lastCard">
+      <h3>上一步</h3>
+      <div id="lastWrap">
+        <div id="lastMove" class="none">尚无着法</div>
+        <button id="btnReplay" title="重播上一步轨迹" disabled>重播</button>
       </div>
     </div>
     <div class="card" id="logCard">
@@ -867,7 +941,7 @@ button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer
       </div>
     </div>
     <button class="big" id="btnStart">开 始 对 局</button>
-    <div class="tips">点击棋子选中，再点亮点落子 · 支持触屏与鼠标</div>
+    <div class="tips">点击棋子选中，再点亮点落子 · 支持触屏与鼠标<br>箭头轨迹会标出对方刚走的那一步</div>
   </div>
 
   <div class="sheet" id="resSheet" style="display:none">
@@ -1423,7 +1497,7 @@ var LEVELS=[
   {name:'棋馆 高手',   title:'高手 · 六级', depth:5, time:1700, rand:.03, min:800,  robe:'#6b3f46', robeD:'#4e2c32', robeL:'#86525a', hair:'#4a4440', beard:1, specs:0},
   {name:'楚河 老人',   title:'大师 · 九段', depth:6, time:3000, rand:0,   min:900,  robe:'#4a4336', robeD:'#352f26', robeL:'#615948', hair:'#cfc8be', beard:1, specs:1}
 ];
-var S={mode:'ai', level:1, mySide:0, flip:false, sound:true};
+var S={mode:'ai', level:1, mySide:0, flip:false, sound:true, trace:true};
 try{ var sv=JSON.parse(localStorage.getItem('xq-set')||'{}'); for(var k in sv) if(k in S) S[k]=sv[k]; }catch(e){}
 function save(){ try{ localStorage.setItem('xq-set',JSON.stringify(S)); }catch(e){} }
 
@@ -1529,7 +1603,8 @@ document.addEventListener('touchstart',function(){ Sfx.unlock(); },{once:true});
 })();
 
 /* ===== 棋盘绘制 ===== */
-var linesEl=$('#lines'), cellsEl=$('#cells'), piecesEl=$('#pieces'), marksEl=$('#marks'), fxEl=$('#fx');
+var linesEl=$('#lines'), traceEl=$('#trace'), cellsEl=$('#cells'),
+    piecesEl=$('#pieces'), marksEl=$('#marks'), fxEl=$('#fx');
 (function drawLines(){
   var o=[];
   function L(x1,y1,x2,y2,w){
@@ -1650,7 +1725,8 @@ function talk(key){
 var G={
   bd:null, stm:0, objAt:[], hist:[], hashes:[], noCap:0,
   over:null, sel:-1, selMoves:[], caps:[[],[]], times:[0,0],
-  busy:false, aiBusy:false, started:false, lastTick:0, capCount:0
+  busy:false, aiBusy:false, started:false, lastTick:0, capCount:0,
+  trace:null
 };
 var ui={
   oppName:$('#oppName'), oppTitle:$('#oppTitle'), oppClock:$('#oppClock'), oppTray:$('#oppTray'),
@@ -1679,6 +1755,7 @@ function refreshOrient(){
     var mi=+mk[i].getAttribute('data-i'); p=dcoord(mi);
     mk[i].style.setProperty('--mx',p[0]); mk[i].style.setProperty('--my',p[1]);
   }
+  drawTrace(false);
 }
 function layout(){
   var area=$('#boardArea'), w=area.clientWidth-8, h=area.clientHeight-8;
@@ -1699,7 +1776,7 @@ function newPiece(code,i){
   return {code:code, el:el, i:i};
 }
 function clearBoardDom(){
-  piecesEl.innerHTML=''; marksEl.innerHTML=''; fxEl.innerHTML='';
+  piecesEl.innerHTML=''; marksEl.innerHTML=''; fxEl.innerHTML=''; traceEl.innerHTML='';
   ui.oppTray.innerHTML=''; ui.meTray.innerHTML='';
 }
 
@@ -1741,6 +1818,80 @@ function showHintMark(from,to){
     marksEl.appendChild(d);
     setTimeout(function(){ if(d.parentNode) d.parentNode.removeChild(d); },2600);
   });
+}
+
+/* ===== 上一步轨迹 ===== */
+function addGhost(i,code,side){
+  if(!code) return;
+  var g=document.createElement('div'), p=dcoord(i);
+  g.className='ghostp '+(side?'b':'r');
+  g.setAttribute('data-i',i);
+  g.style.setProperty('--mx',p[0]); g.style.setProperty('--my',p[1]);
+  g.innerHTML='<b>'+XQ.CHAR[code]+'</b>';
+  marksEl.appendChild(g);
+}
+/* 折线拐点：马走日时画出“先直后拐”的真实路线 */
+function traceGeom(from,to,code){
+  var a=dcoord(from), b=dcoord(to), pts=[[a[0],a[1]]];
+  if((code&7)===XQ.HRS){
+    if(Math.abs(b[0]-a[0])>Math.abs(b[1]-a[1])) pts.push([b[0],a[1]]);
+    else pts.push([a[0],b[1]]);
+  }
+  pts.push([b[0],b[1]]);
+  return pts;
+}
+function shrink(p,q,d){
+  var dx=q[0]-p[0], dy=q[1]-p[1], L=Math.sqrt(dx*dx+dy*dy)||1;
+  return [p[0]+dx/L*d, p[1]+dy/L*d];
+}
+function tracePath(from,to,code){
+  var pts=traceGeom(from,to,code), n=pts.length, i, len=0, d;
+  pts[0]=shrink(pts[0],pts[1],.24);
+  pts[n-1]=shrink(pts[n-1],pts[n-2],.46);
+  d='M'+pts[0][0].toFixed(3)+','+pts[0][1].toFixed(3);
+  for(i=1;i<n;i++){
+    d+='L'+pts[i][0].toFixed(3)+','+pts[i][1].toFixed(3);
+    len+=Math.sqrt(Math.pow(pts[i][0]-pts[i-1][0],2)+Math.pow(pts[i][1]-pts[i-1][1],2));
+  }
+  return {d:d, pts:pts, len:len};
+}
+function drawTrace(fresh){
+  traceEl.innerHTML='';
+  var t=G.trace;
+  if(!t||!S.trace) return;
+  var g=tracePath(t.from,t.to,t.code), pts=g.pts, n=pts.length;
+  var tip=pts[n-1], prev=pts[n-2];
+  var ang=Math.atan2(tip[1]-prev[1], tip[0]-prev[0]);
+  var ca=Math.cos(ang), sa=Math.sin(ang);
+  function corner(L,W){
+    return (tip[0]-ca*L-sa*W).toFixed(3)+','+(tip[1]-sa*L+ca*W).toFixed(3);
+  }
+  var head=tip[0].toFixed(3)+','+tip[1].toFixed(3)+' '+corner(.28,.155)+' '+corner(.28,-.155);
+  var o='<g class="tr '+(t.side?'b':'r')+'">';
+  o+='<path class="halo" d="'+g.d+'"/>';
+  o+='<polygon class="hh" points="'+head+'"/>';
+  o+='<path class="ln2" d="'+g.d+'"/>';
+  if(fresh) o+='<path class="draw" style="--len:'+g.len.toFixed(3)+'" d="'+g.d+'"/>';
+  o+='<circle class="org" cx="'+pts[0][0].toFixed(3)+'" cy="'+pts[0][1].toFixed(3)+'" r=".1"/>';
+  o+='<polygon class="head" points="'+head+'"/>';
+  o+='</g>';
+  traceEl.innerHTML=o;
+}
+/* 按棋谱最后一着重画：起终点框 + 起点残影 + 轨迹箭头 */
+function paintLast(fresh){
+  marksEl.innerHTML='';
+  var h=G.hist[G.hist.length-1];
+  if(!h){ G.trace=null; traceEl.innerHTML=''; return; }
+  var from=h.m>>7, to=h.m&127;
+  G.trace={from:from, to:to, code:G.bd[to], side:h.side};
+  setMarks(from,to);
+  if(S.trace) addGhost(from,G.bd[to],h.side);
+  drawTrace(fresh);
+}
+function replayTrace(){
+  if(!G.trace||G.busy) return;
+  if(!S.trace){ S.trace=true; save(); syncControls(); }
+  paintLast(true); Sfx.tick();
 }
 
 /* ===== 特效 ===== */
@@ -1804,7 +1955,7 @@ function rebuildTrays(){
 /* ===== 棋谱 ===== */
 function renderLog(){
   var h='', i;
-  if(!G.hist.length){ ui.log.innerHTML='<div class="empty">尚无着法</div>'; return; }
+  if(!G.hist.length){ ui.log.innerHTML='<div class="empty">尚无着法</div>'; renderLast(); return; }
   for(i=0;i<G.hist.length;i+=2){
     var n=(i/2|0)+1;
     var a=G.hist[i], b=G.hist[i+1];
@@ -1814,6 +1965,20 @@ function renderLog(){
   }
   ui.log.innerHTML=h;
   ui.log.scrollTop=ui.log.scrollHeight;
+  renderLast();
+}
+function renderLast(){
+  var el=$('#lastMove'), h=G.hist[G.hist.length-1];
+  if(!h){
+    el.className='none'; el.textContent='尚无着法';
+    $('#btnReplay').disabled=true;
+    return;
+  }
+  el.className='';
+  el.innerHTML='<span class="who '+(h.side?'b':'r')+'">'+(h.side?'黑':'红')+'</span>'+
+    '<span class="mv">'+h.notation+'</span>'+
+    (h.cap?'<span class="cap">吃'+XQ.CHAR[h.cap]+'</span>':'');
+  $('#btnReplay').disabled=false;
 }
 
 /* ===== 名牌 / 时钟 ===== */
@@ -1858,6 +2023,7 @@ function newGame(){
   G.stm=0; G.objAt=new Array(90); G.hist=[]; G.hashes=[]; G.noCap=0;
   G.over=null; G.sel=-1; G.selMoves=[]; G.caps=[[],[]]; G.times=[0,0];
   G.busy=false; G.aiBusy=false; G.capCount=0; G.lastTick=Date.now();
+  G.trace=null;
   S.flip = (S.mode==='ai' && S.mySide===1);
   clearBoardDom();
   noAnim(function(){
@@ -1928,6 +2094,7 @@ function doMove(from,to,byAI){
     G.stm=mover^1;
     G.hashes.push(XQ.hashOf(G.bd,G.stm));
     G.busy=false;
+    paintLast(true);
     afterMove(capCode,mover,byAI);
   })['catch'](function(){ G.busy=false; });
 }
@@ -2062,8 +2229,7 @@ function undo(){
   }
   for(var k=0;k<steps;k++) undoOne();
   rebuildTrays();
-  marksEl.innerHTML='';
-  if(G.hist.length){ var l=G.hist[G.hist.length-1]; setMarks(l.m>>7,l.m&127); }
+  paintLast(false);
   markCheck(XQ.inCheck(G.bd,G.stm));
   renderLog(); updatePlates();
   Sfx.tick();
@@ -2163,6 +2329,8 @@ function syncControls(){
   $('#avatarBox').style.opacity=1;
   $('#btnSound').classList.toggle('off',!S.sound);
   $('#btnSound').textContent=S.sound?'🔊':'🔇';
+  $('#btnTrace').classList.toggle('on',S.trace);
+  $('#btnTrace').textContent=S.trace?'轨迹 开':'轨迹 关';
   updatePlates();
 }
 $('#btnNew').addEventListener('click',function(){ newGame(); });
@@ -2171,6 +2339,12 @@ $('#btnHint').addEventListener('click',hint);
 function doFlip(){ S.flip=!S.flip; noAnim(refreshOrient); Sfx.tick(); }
 $('#btnFlip').addEventListener('click',doFlip);
 $('#btnFlip2').addEventListener('click',doFlip);
+$('#btnTrace').addEventListener('click',function(){
+  S.trace=!S.trace; save(); syncControls();
+  paintLast(S.trace); Sfx.tick();
+  toast(S.trace?'显示上一步轨迹':'已隐藏轨迹');
+});
+$('#btnReplay').addEventListener('click',replayTrace);
 $('#btnSound').addEventListener('click',function(){
   S.sound=!S.sound; save(); syncControls();
   if(S.sound){ Sfx.unlock(); Sfx.knock(); }
@@ -2195,6 +2369,8 @@ $('#veil').addEventListener('click',function(e){
 });
 document.addEventListener('keydown',function(e){
   if(e.key==='u'||e.key==='U') undo();
+  else if(e.key==='t'||e.key==='T') $('#btnTrace').click();
+  else if(e.key==='r'||e.key==='R') replayTrace();
   else if(e.key==='h'||e.key==='H') hint();
   else if(e.key==='n'||e.key==='N') newGame();
   else if(e.key==='Escape') $('#veil').classList.remove('show');
